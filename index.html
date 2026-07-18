@@ -68,7 +68,9 @@ aside{background:var(--panel);flex:0 0 auto;overflow-y:auto}
 #wires path.hit:hover{stroke:#0F646922}
 #wires path.wire.hl{stroke:var(--dial);stroke-width:2.6}
 #wires line.guide{stroke:var(--dial);stroke-width:1.2;stroke-dasharray:6 4;opacity:.85}
-#wires circle.handle{fill:var(--white);stroke:var(--dial);stroke-width:2;cursor:move;pointer-events:all}
+#wires circle.handle{fill:var(--white);stroke:var(--dial);stroke-width:2;pointer-events:all}
+#wires circle.handle[data-axis="x"]{cursor:ew-resize}
+#wires circle.handle[data-axis="y"]{cursor:ns-resize}
 
 .blk{position:absolute;user-select:none;cursor:grab}
 .blk.dragging{cursor:grabbing}
@@ -422,15 +424,20 @@ function compile(model){
       Object.assign(nd,{n:ss.n,a:ss.a,c:ss.c,D:ss.D}); nd.feed=Math.abs(ss.D)>1e-15; }
     nodes.set(b.id,nd);
   }
-  let off=0;
-  for(const nd of nodes.values()){ nd.off=off;
-    if(nd.kind==="mtf"){ for(const row of nd.sub) for(const ss of row) if(ss){ ss.off=off; off+=ss.n; } }
-    else off+=nd.n; }
-  const NX=off;
   const inc=new Map(); for(const id of nodes.keys()) inc.set(id,[]);
   for(const e of model.edges){ if(!nodes.has(e.from)||!nodes.has(e.to)) continue;
     inc.get(e.to)[e.port||0]={b:e.from,p:e.fromPort||0}; }
-  const need=[...nodes.values()].filter(n=>n.kind!=="src" && (n.feed||n.kind==="sum"||n.kind==="sat"||n.kind==="scope"||n.kind==="node"));
+  const reach=new Set(); { const stk=[...nodes.values()].filter(n=>n.kind==="scope").map(n=>n.id);
+    while(stk.length){ const id=stk.pop(); if(reach.has(id)) continue; reach.add(id);
+      for(const src of (inc.get(id)||[])) if(src&&!reach.has(src.b)) stk.push(src.b); } }
+  for(const nd of nodes.values()) nd.live=reach.has(nd.id);
+  let off=0;
+  for(const nd of nodes.values()){ nd.off=off;
+    if(!reach.has(nd.id)){ if(nd.kind==="mtf"){ for(const row of nd.sub) for(const ss of row) if(ss) ss.off=off; } continue; }
+    if(nd.kind==="mtf"){ for(const row of nd.sub) for(const ss of row) if(ss){ ss.off=off; off+=ss.n; } }
+    else off+=nd.n; }
+  const NX=off;
+  const need=[...nodes.values()].filter(n=>n.live && n.kind!=="src" && (n.feed||n.kind==="sum"||n.kind==="sat"||n.kind==="scope"||n.kind==="node"));
   const inSet=new Set(need.map(n=>n.id));
   const deg=new Map(need.map(n=>[n.id,0])), adj=new Map(need.map(n=>[n.id,[]]));
   for(const n of need) for(const src of (inc.get(n.id)||[])) if(src&&inSet.has(src.b)){ deg.set(n.id,deg.get(n.id)+1); adj.get(src.b).push(n.id); }
@@ -452,6 +459,7 @@ function mtfOut(nd,X,u){
 function outputs(c,X,t,zeroSrc){
   const o={};
   for(const nd of c.list){
+    if(nd.live===false) continue;
     if(nd.kind==="src") o[nd.id]=[zeroSrc?0:nd.def.src(nd.block.params,t)];
     else if(nd.kind==="sys"&&!nd.feed){ let y=0; for(let i=0;i<nd.n;i++) y+=nd.c[i]*X[nd.off+i]; o[nd.id]=[y]; }
     else if(nd.kind==="mtf"&&!nd.feed) o[nd.id]=mtfOut(nd,X,null);
@@ -476,6 +484,7 @@ function derivs(c,X,t,dX,zeroSrc){
     let acc=u; for(let i=0;i<n;i++) acc-=ss.a[n-1-i]*X[off+i];
     dX[off+n-1]=acc; };
   for(const nd of c.list){
+    if(!nd.live) continue;
     const src=c.inc.get(nd.id)||[];
     const u=i=>{ const s=src[i]; if(!s) return 0; const a=o[s.b]; return a?(a[s.p]||0):0; };
     if(nd.kind==="sys"&&nd.n) step({off:nd.off,n:nd.n,a:nd.a},u(0));
@@ -511,7 +520,15 @@ function sysPoles(model){
 function simulate(model,T){
   const c=compile(model);
   const scopes=c.list.filter(n=>n.kind==="scope");
-  const steps=4000, dt=T/steps, every=Math.max(1,Math.round(steps/1400));
+  /* Schnellste Zeitkonstante schätzen (nur simulierte Blöcke) und Schrittweite so wählen,
+     dass RK4 stabil bleibt: dt·|λ_max| ≲ 0,2. |λ| ≤ 1 + max|a_i| (Cauchy-Schranke). */
+  let lam=1;
+  for(const nd of c.list){ if(!nd.live) continue;
+    if(nd.kind==="sys"&&nd.a) for(const a of nd.a) lam=Math.max(lam,1+Math.abs(a));
+    else if(nd.kind==="mtf") for(const row of nd.sub) for(const ss of row) if(ss&&ss.a) for(const a of ss.a) lam=Math.max(lam,1+Math.abs(a)); }
+  let steps=Math.ceil(T*lam/0.2);
+  steps=Math.min(400000,Math.max(4000,steps));
+  const dt=T/steps, every=Math.max(1,Math.round(steps/1400));
   let X=new Float64Array(c.NX);
   const k1=new Float64Array(c.NX),k2=new Float64Array(c.NX),k3=new Float64Array(c.NX),k4=new Float64Array(c.NX),tmp=new Float64Array(c.NX);
   const ts=[], data=scopes.map(()=>[]);
@@ -655,25 +672,48 @@ function routeEdge(A,B,e){
   if(t.dir==="N") b=0;
   const E={x:s.x+dOut*a,y:s.y};
   const P= dIn? {x:t.x-dIn*b, y:t.y} : {x:t.x, y:t.y+(tdir==="T"?-26:26)};
-  let fam,def;
   const drop=Math.abs(P.y-E.y)>16;
-  if(dIn && dOut===dIn && (P.x-E.x)*dOut>-8 && !(s.dir==="N"&&drop)){ fam="V"; def=(E.x+P.x)/2; }
-  else{
-    fam="H";
+  let fam;
+  if(dIn && dOut===dIn && (P.x-E.x)*dOut>-8 && !(s.dir==="N"&&drop)) fam="V";
+  else fam="H";
+
+  /* Standard-Lage des waagerechten Mittelstücks (fam H) */
+  let yDef=E.y;
+  if(fam==="H"){
     if(dIn===0){
-      if(tdir==="B") def=(E.y>P.y+8)?E.y:Math.max(BOT(A),BOT(B))+34;
-      else           def=(E.y<P.y-8)?E.y:Math.min(A.y,B.y)-34;
+      if(tdir==="B") yDef=(E.y>P.y+8)?E.y:Math.max(BOT(A),BOT(B))+34;
+      else           yDef=(E.y<P.y-8)?E.y:Math.min(A.y,B.y)-34;
     }
-    /* Abzweig: senkrecht auf die Höhe des Ziels, dann waagerecht hinein */
-    else if(drop && (Math.sign(P.x-E.x)===dIn || Math.abs(P.x-E.x)<1)) def=P.y;
-    else if(dOut!==dIn) def=E.y;
-    else def=Math.max(BOT(A),BOT(B))+34;
+    else if(drop && (Math.sign(P.x-E.x)===dIn || Math.abs(P.x-E.x)<1)) yDef=P.y;
+    else if(dOut!==dIn) yDef=E.y;
+    else yDef=Math.max(BOT(A),BOT(B))+34;
   }
-  const m=(e.fam===fam&&typeof e.m==="number")?e.m:def;
+
+  /* Overrides werden als OFFSET zur Standard-Lage gespeichert (e.rails, nach Familie gekeyt),
+     damit sie beim Verschieben der Blöcke relativ mitwandern.
+     Legacy: einzelnes e.m (absolut) aus Presets/älteren Ständen. */
+  const ov = (e.rails && e.rails.fam===fam) ? e.rails : null;
+  const legacy = (e.m!=null && e.fam===fam && !ov);
+  const get=(id,def)=> ov && ov[id]!=null ? def+ov[id] : def;
+
+  const rails=[];
   const pts=[{x:s.x,y:s.y},E];
-  if(fam==="V") pts.push({x:m,y:E.y},{x:m,y:P.y});
-  else          pts.push({x:E.x,y:m},{x:P.x,y:m});
+  if(fam==="V"){
+    let vx = legacy ? e.m : get("vx",(E.x+P.x)/2);
+    const lo=Math.min(E.x,P.x), hi=Math.max(E.x,P.x); vx=Math.max(lo,Math.min(hi,vx));
+    const hasV=Math.abs(E.y-P.y)>0.5;
+    if(hasV){ pts.push({x:vx,y:E.y},{x:vx,y:P.y});
+      rails.push({id:"vx",axis:"x",def:(E.x+P.x)/2,val:vx,handle:{x:vx,y:(E.y+P.y)/2}}); }
+  } else {
+    let y = legacy ? e.m : get("y",yDef);
+    let ox = get("ox",E.x), ix = get("ix",P.x);
+    pts.push({x:ox,y:E.y},{x:ox,y:y},{x:ix,y:y},{x:ix,y:P.y});
+    rails.push({id:"y",axis:"y",def:yDef,val:y,handle:{x:(ox+ix)/2,y}});
+    if(Math.abs(E.y-y)>12) rails.push({id:"ox",axis:"x",def:E.x,val:ox,handle:{x:ox,y:(E.y+y)/2}});
+    if(Math.abs(P.y-y)>12) rails.push({id:"ix",axis:"x",def:P.x,val:ix,handle:{x:ix,y:(P.y+y)/2}});
+  }
   pts.push(P,{x:t.x,y:t.y});
+
   const cl=[pts[0]];
   for(let i=1;i<pts.length;i++){ const q=cl[cl.length-1],p=pts[i]; if(Math.abs(p.x-q.x)>0.5||Math.abs(p.y-q.y)>0.5) cl.push(p); }
   let d=`M ${cl[0].x} ${cl[0].y}`;
@@ -686,9 +726,8 @@ function routeEdge(A,B,e){
   const last=cl[cl.length-1];
   d+=` L ${last.x} ${last.y}`;
   const prev=cl[cl.length-2]||cl[0];
-  const handle = fam==="V" ? {x:m,y:(E.y+P.y)/2,axis:"x"} : {x:(E.x+P.x)/2,y:m,axis:"y"};
   const segs=[]; for(let i=1;i<cl.length;i++) segs.push({a:cl[i-1],b:cl[i]});
-  return {d,fam,m,handle,segs,tip:last,dirv:norm(last,prev)};
+  return {d,fam,rails,segs,tip:last,dirv:norm(last,prev)};
 }
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 function norm(from,to){ const dx=to.x-from.x,dy=to.y-from.y,l=Math.hypot(dx,dy)||1; return {x:dx/l,y:dy/l}; }
@@ -727,7 +766,8 @@ function drawWires(ghost){
     }
     if(DEFS[A.type].shape!=="node") h+=`<circle cx="${a.x}" cy="${a.y}" r="2.6" fill="var(--ink)"/>`;
     h+=`<path class="hit" data-edge="${idx}" d="${r.d}"/>`;
-    if(on) h+=`<circle class="handle" data-edge="${idx}" cx="${r.handle.x}" cy="${r.handle.y}" r="4.5"/>`;
+    if(on) for(const rl of r.rails)
+      h+=`<circle class="handle" data-edge="${idx}" data-rail="${rl.id}" data-axis="${rl.axis}" cx="${rl.handle.x}" cy="${rl.handle.y}" r="4.5"/>`;
   });
   if(snapGuide){
     let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
@@ -800,10 +840,10 @@ function inspector(){
       return (x.type==="tf"?x.params.name:d.cap)||d.name; };
     el.innerHTML=`<div class="sec"><h3>Leitung</h3>
       <div style="font-family:var(--f-mono);font-size:12.5px;margin-bottom:8px">${esc(nm(A,"out",e.fromPort||0))} &nbsp;→&nbsp; ${esc(nm(B,"in",e.port||0))}${B&&B.ins>1&&!DEFS[B.type].matrix?` (${PORTNAME[portPos(B,"in",e.port||0).dir]})`:""}</div>
-      <p class="hint">Leitung greifen und ziehen — sie weicht unabhängig von den Blöcken aus und rastet auf der Höhe anderer Leitungen ein. Der Punkt markiert den beweglichen Abschnitt.<br><br>Von einem Eingang auf diese Leitung ziehen erzeugt eine Verzweigung.</p></div>
+      <p class="hint">Jeder türkise Griff verschiebt ein Teilstück: waagerechte Griffe (↕) die Höhe, senkrechte (↔) die seitliche Lage der Steigleitungen. Die Verschiebung ist relativ und wandert beim Verschieben der Blöcke mit; auf der Linie anderer Leitungen rastet sie ein.<br><br>Von einem Eingang auf diese Leitung ziehen erzeugt eine Verzweigung.</p></div>
       <div class="sec"><button class="btn ghost" id="eReset" style="width:100%;margin-bottom:6px">Verlauf zurücksetzen</button>
       <button class="btn ghost" id="eDel" style="width:100%">Leitung löschen</button></div>`;
-    $("#eReset").addEventListener("click",()=>{ delete e.m; delete e.fam; render(); commit(); });
+    $("#eReset").addEventListener("click",()=>{ delete e.m; delete e.fam; delete e.rails; render(); commit(); });
     $("#eDel").addEventListener("click",()=>{ model.edges.splice(selEdge,1); selEdge=null; render(); inspector(); run(); commit(); });
     return;
   }
@@ -1219,6 +1259,13 @@ stage.addEventListener("mousedown",e=>{
     else { arm=t; render(); }
     return;
   }
+  const handle=e.target.closest("circle.handle");
+  if(handle){ e.preventDefault();
+    const idx=+handle.dataset.edge, ed=model.edges[idx];
+    selEdge=idx; sel=null; arm=null; render(); inspector();
+    wdrag={e:ed,railId:handle.dataset.rail,axis:handle.dataset.axis,fam:ed._r.fam};
+    return;
+  }
   const hit=e.target.closest("[data-edge]");
   if(hit&&arm&&(arm.kind==="in"||arm.kind==="node")){
     e.preventDefault();
@@ -1234,9 +1281,8 @@ stage.addEventListener("mousedown",e=>{
     drag={b,ox:e.clientX/view.k-b.x,oy:e.clientY/view.k-b.y,moved:false};
     render(); inspector(); return; }
   if(hit){ e.preventDefault();
-    const idx=+hit.dataset.edge, ed=model.edges[idx];
+    const idx=+hit.dataset.edge;
     selEdge=idx; sel=null; arm=null; render(); inspector();
-    if(ed&&ed._r) wdrag={e:ed,axis:ed._r.handle.axis,fam:ed._r.fam};
     return; }
   sel=null; selEdge=null; arm=null; render(); inspector();
   pan={x:e.clientX-view.x,y:e.clientY-view.y}; stage.style.cursor="grabbing";
@@ -1253,11 +1299,17 @@ window.addEventListener("mousemove",e=>{
   }
   if(wdrag){
     const w=worldPos(e); let v=wdrag.axis==="x"?w.x:w.y;
+    const ed=wdrag.e, rl=(ed._r.rails||[]).find(r=>r.id===wdrag.railId);
     snapGuide=null;
-    for(const ed of model.edges){ if(ed===wdrag.e||!ed._r) continue;
-      if(ed._r.handle.axis!==wdrag.axis) continue;
-      if(Math.abs(ed._r.m-v)<7/view.k){ v=ed._r.m; snapGuide={axis:wdrag.axis==="x"?"x":"y",v}; break; } }
-    wdrag.e.fam=wdrag.fam; wdrag.e.m=snapGuide?v:Math.round(v/2)*2; render(); return;
+    for(const o of model.edges){ if(o===ed||!o._r) continue;
+      for(const orl of o._r.rails){ if(orl.axis!==wdrag.axis) continue;
+        if(Math.abs(orl.val-v)<7/view.k){ v=orl.val; snapGuide={axis:wdrag.axis,v}; break; } }
+      if(snapGuide) break; }
+    if(!snapGuide) v=Math.round(v/2)*2;
+    ed.rails = (ed.rails&&ed.rails.fam===wdrag.fam) ? ed.rails : {fam:wdrag.fam};
+    ed.rails[wdrag.railId] = v - (rl?rl.def:v);   /* als Offset ablegen */
+    delete ed.m; delete ed.fam;                    /* Legacy-Absolutwert ablösen */
+    render(); return;
   }
   if(drag){
     drag.moved=true;
