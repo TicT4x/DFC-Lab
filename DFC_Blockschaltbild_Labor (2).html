@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DFC — Blockschaltbild-Labor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E9ECE6; --panel:#F7F8F4; --ink:#1B2A33; --ink2:#5A6B74; --ink3:#8C9AA1;
+  --rule:#C3CCC5; --rule2:#DDE3DC; --grid:#D6DCD4; --grid2:#E1E6DE;
+  --dial:#0F6469; --dial-soft:#0F646922; --warn:#9E3B26; --white:#FFFFFF;
+  --t1:#0F6469; --t2:#A8412A; --t3:#4A3E8F; --t4:#6B7A15; --t5:#B0791C;
+  --f-disp:"IBM Plex Sans Condensed",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+  --ph:320px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;min-height:0}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:14px;overflow:hidden}
+button,input,select{font-family:inherit;color:inherit}
+.eyebrow{font-family:var(--f-disp);text-transform:uppercase;letter-spacing:.14em;font-size:10px;color:var(--ink3);font-weight:600}
+
+/* ---------- shell ---------- */
+#app{display:flex;flex-direction:column;height:100%}
+header{display:flex;align-items:center;gap:18px;padding:10px 16px;background:var(--panel);border-bottom:1.5px solid var(--ink);flex:0 0 auto;flex-wrap:wrap}
+header h1{font-family:var(--f-disp);font-weight:700;font-size:19px;letter-spacing:-.01em;margin:0;line-height:1}
+header .brand{display:flex;flex-direction:column;gap:3px}
+header .spacer{flex:1}
+.ctl{display:flex;align-items:center;gap:6px}
+label.tiny{font-family:var(--f-disp);text-transform:uppercase;letter-spacing:.1em;font-size:10px;color:var(--ink2);font-weight:600}
+select,input[type=number],input[type=text]{background:var(--white);border:1px solid var(--rule);padding:5px 7px;font-size:13px;font-family:var(--f-mono);border-radius:0}
+select:focus,input:focus,button:focus-visible{outline:2px solid var(--dial);outline-offset:1px}
+.btn{background:var(--white);border:1.5px solid var(--ink);padding:6px 11px;font-family:var(--f-disp);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.08em;cursor:pointer}
+.btn:hover{background:var(--ink);color:var(--panel)}
+.btn.primary{background:var(--dial);border-color:var(--dial);color:#fff}
+.btn.primary:hover{background:#0b4b4f}
+.btn.ghost{border-color:var(--rule);color:var(--ink2)}
+.btn.ghost:hover{background:var(--rule2);color:var(--ink)}
+
+main{flex:1 1 auto;display:flex;min-height:120px}
+aside{background:var(--panel);flex:0 0 auto;overflow-y:auto}
+#palette{width:186px;border-right:1.5px solid var(--ink)}
+#inspector{width:270px;border-left:1.5px solid var(--ink)}
+.sec{padding:10px 12px;border-bottom:1px solid var(--rule2)}
+.sec h3{margin:0 0 8px;font-family:var(--f-disp);text-transform:uppercase;letter-spacing:.12em;font-size:10px;color:var(--ink3);font-weight:700}
+.pal-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:transparent;border:1px solid transparent;padding:5px 6px;cursor:pointer;font-size:12.5px}
+.pal-item:hover{background:var(--white);border-color:var(--rule)}
+.pal-item .mini{flex:0 0 34px;height:22px;border:1.2px solid var(--ink);background:var(--white);display:flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-size:9px;line-height:1}
+.pal-item .mini.round{border-radius:50%;width:22px;flex-basis:22px;margin-left:6px;margin-right:6px}
+
+/* ---------- canvas ---------- */
+#stage{flex:1;position:relative;overflow:hidden;min-width:0;background:
+  linear-gradient(var(--grid2) 1px,transparent 1px) 0 0/12px 12px,
+  linear-gradient(90deg,var(--grid2) 1px,transparent 1px) 0 0/12px 12px,
+  linear-gradient(var(--grid) 1px,transparent 1px) 0 0/60px 60px,
+  linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/60px 60px,var(--paper);
+  cursor:default}
+#world{position:absolute;inset:0;transform-origin:0 0}
+#wires{position:absolute;left:0;top:0;width:4000px;height:3000px;overflow:visible;pointer-events:none}
+#wires path.hit{pointer-events:stroke;stroke:transparent;stroke-width:13;fill:none;cursor:move}
+#wires path.wire{fill:none;stroke:var(--ink);stroke-width:1.4;stroke-linejoin:round}
+#wires path.wire.sel{stroke:var(--dial);stroke-width:2.4}
+#wires path.wire.ghost{stroke:var(--dial);stroke-dasharray:5 4}
+#wires path.hit:hover{stroke:#0F646922}
+#wires path.wire.hl{stroke:var(--dial);stroke-width:2.6}
+#wires line.guide{stroke:var(--dial);stroke-width:1.2;stroke-dasharray:6 4;opacity:.85}
+#wires circle.handle{fill:var(--white);stroke:var(--dial);stroke-width:2;cursor:move;pointer-events:all}
+
+.blk{position:absolute;user-select:none;cursor:grab}
+.blk.dragging{cursor:grabbing}
+.blk .body{background:var(--white);border:1.6px solid var(--ink);display:flex;align-items:center;justify-content:center;width:112px;height:58px;padding:2px 6px;text-align:center}
+.blk.sum .body{width:34px;height:34px;border-radius:50%;padding:0}
+.blk.node .body{width:10px;height:10px;border-radius:50%;background:var(--ink);border:none;padding:0;
+  position:absolute;left:1px;top:1px;transform:none;transition:transform .08s}
+.blk.node .body:hover{transform:scale(1.4);background:var(--dial)}
+.blk.node.sel .body{background:var(--dial);box-shadow:0 0 0 3px var(--dial-soft)}
+.blk.node{cursor:crosshair}
+.plab{position:absolute;font-family:var(--f-mono);font-size:10.5px;color:var(--ink2);white-space:nowrap;pointer-events:none}
+.blk.sel .body{border-color:var(--dial);box-shadow:0 0 0 2px var(--dial-soft)}
+.blk .cap{position:absolute;bottom:100%;left:0;margin-bottom:3px;font-family:var(--f-disp);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);white-space:nowrap;font-weight:600}
+.blk .expr{font-family:var(--f-mono);font-size:12.5px;line-height:1.15;white-space:nowrap}
+.blk .expr.sm{font-size:10.5px}
+.frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:0 1px}
+.frac .n{padding:0 3px}
+.frac .d{padding:0 3px;border-top:1.3px solid var(--ink);margin-top:1px}
+.port{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--white);border:1.4px solid var(--ink);cursor:crosshair;transform:translate(-50%,-50%)}
+.port:hover,.port.armed{background:var(--dial);border-color:var(--dial);transform:translate(-50%,-50%) scale(1.35)}
+.psign{position:absolute;font-family:var(--f-mono);font-size:13px;font-weight:600;color:var(--ink);pointer-events:none;transform:translate(-50%,-50%)}
+
+/* ---------- inspector ---------- */
+.prow{margin-bottom:9px}
+.prow .lab{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
+.prow .lab span:first-child{font-family:var(--f-disp);font-size:11.5px;font-weight:600;letter-spacing:.04em}
+.prow input[type=number]{width:74px;text-align:right;font-size:12px;padding:3px 5px}
+.prow input[type=text]{width:100%;font-size:12px;padding:3px 5px}
+input[type=range]{width:100%;accent-color:var(--dial);height:16px}
+.gline{font-family:var(--f-mono);font-size:12px;background:var(--white);border:1px solid var(--rule2);padding:8px;display:flex;justify-content:center;align-items:center;min-height:44px}
+.rootlist{font-family:var(--f-mono);font-size:11.5px;color:var(--ink2);line-height:1.6}
+.tag{display:inline-block;font-family:var(--f-disp);font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;border:1px solid currentColor}
+.tag.ok{color:var(--dial)} .tag.bad{color:var(--warn)}
+.hint{font-size:11.5px;color:var(--ink3);line-height:1.45}
+#bode{width:100%;height:118px;display:block;background:var(--white);border:1px solid var(--rule2)}
+
+/* ---------- plot ---------- */
+#resizer{flex:0 0 auto;height:8px;background:var(--rule2);border-top:1.5px solid var(--ink);cursor:ns-resize;position:relative}
+#resizer::after{content:"";position:absolute;left:50%;top:2.5px;width:46px;height:2px;margin-left:-23px;background:var(--ink3)}
+#resizer:hover::after{background:var(--dial)}
+#plotwrap{flex:0 0 var(--ph);min-height:120px;background:var(--panel);display:flex;flex-direction:column}
+#plotbar{display:flex;align-items:center;gap:14px;padding:6px 14px;border-bottom:1px solid var(--rule2);flex-wrap:wrap}
+#legend{display:flex;gap:12px;flex-wrap:wrap}
+.lg{display:flex;align-items:center;gap:5px;font-family:var(--f-mono);font-size:11.5px}
+.lg i{width:14px;height:3px;display:block}
+#plot,#splane{flex:1 1 auto;width:100%;display:block;min-height:0}
+.tabbtn{background:none;border:none;border-bottom:2px solid transparent;font-family:var(--f-disp);font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);padding:4px 2px;cursor:pointer}
+.tabbtn.on{color:var(--ink);border-bottom-color:var(--dial)}
+.tabbtn:hover{color:var(--ink)}
+#status{font-family:var(--f-disp);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+#status.bad{color:var(--warn)} #status.ok{color:var(--ink3)}
+
+/* ---------- modal ---------- */
+.modal{position:fixed;inset:0;background:#1b2a33cc;display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+.modal.on{display:flex}
+.sheet{background:var(--panel);border:1.5px solid var(--ink);max-width:760px;width:100%;max-height:86vh;overflow:auto;padding:22px 26px}
+.sheet h2{font-family:var(--f-disp);font-size:20px;margin:0 0 4px}
+.sheet table{border-collapse:collapse;width:100%;font-size:13px;margin:10px 0 18px}
+.sheet td,.sheet th{border-bottom:1px solid var(--rule2);padding:6px 8px;text-align:left;vertical-align:middle}
+.sheet th{font-family:var(--f-disp);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+.sheet code{font-family:var(--f-mono);font-size:12px;background:var(--white);padding:1px 4px;border:1px solid var(--rule2)}
+.sheet p{line-height:1.55}
+#io{width:100%;height:150px;font-family:var(--f-mono);font-size:11px;border:1px solid var(--rule)}
+
+@media (max-width:860px){
+  main{flex-direction:column}
+  #palette,#inspector{width:100%;border:none;border-bottom:1.5px solid var(--ink);max-height:170px}
+  #stage{min-height:240px}
+  #plotwrap{flex-basis:210px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+  <div class="brand">
+    <span class="eyebrow">Dynamics of Flight / Flight Control — FH Aachen</span>
+    <h1>Blockschaltbild-Labor</h1>
+  </div>
+  <div class="ctl">
+    <label class="tiny" for="preset">Beispiel</label>
+    <select id="preset">
+      <option value="">— leeres Blatt —</option>
+      <option value="loop">Standardregelkreis (Ü2.3 / 3.4.1)</option>
+      <option value="basics">Grundtypen im Vergleich (3.3.2)</option>
+      <option value="msd">Feder-Masse-Dämpfer, Signalflussplan (Ü2.2)</option>
+      <option value="pitch">Nickdämpfer DO 328 (Ü3.3)</option>
+      <option value="pitch2">Dämpfer erweitert: ω₀=3, D=0,8 (Ü3.5)</option>
+      <option value="yaw">Gierdämpfer mit Hochpass (Ü4.1)</option>
+      <option value="theta">Lageregler Θ, P vs. PI (Ü4.2)</option>
+      <option value="pidbuild">PID aus Einzelblöcken (P + I + DT1)</option>
+      <option value="alt">Höhenregelung DO 328 (Ü5.1–5.2)</option>
+      <option value="altwind">Höhenregelung mit Aufwind (Ü5.3–5.4)</option>
+      <option value="speed">Fahrtregelung über Schub (Ü6)</option>
+    </select>
+  </div>
+  <div class="spacer"></div>
+  <div class="ctl">
+    <label class="tiny" for="tend">Simulationszeit</label>
+    <input type="number" id="tend" value="20" min="0.1" step="1" style="width:64px">
+    <span class="tiny">s</span>
+  </div>
+  <button class="btn ghost" id="btnUndo" title="Strg+Z">↶</button>
+  <button class="btn ghost" id="btnRedo" title="Strg+Y">↷</button>
+  <button class="btn ghost" id="btnHelp">Blockübersicht</button>
+  <button class="btn ghost" id="btnIO">Speichern / Laden</button>
+  <button class="btn ghost" id="btnClear">Leeren</button>
+  <button class="btn primary" id="btnRun">Simulieren</button>
+</header>
+
+<main>
+  <aside id="palette"></aside>
+  <div id="stage">
+    <div id="world">
+      <svg id="wires"></svg>
+      <div id="blocks"></div>
+    </div>
+  </div>
+  <aside id="inspector"></aside>
+</main>
+
+<div id="resizer" title="Ziehen: Diagramm größer/kleiner · Doppelklick: zurücksetzen"></div>
+<div id="plotwrap">
+  <div id="plotbar">
+    <button class="tabbtn on" data-tab="time">Zeitantwort</button>
+    <button class="tabbtn" data-tab="splane">s-Ebene / WOK</button>
+    <div id="legend"></div>
+    <span id="wokCtl" style="display:none;align-items:center;gap:6px">
+      <label class="tiny" for="wokSel">Wurzelortskurve über</label>
+      <select id="wokSel"><option value="">— keine —</option></select>
+    </span>
+    <span id="sinfo" style="display:none;font-family:var(--f-mono);font-size:11.5px;color:var(--ink2)"></span>
+    <div class="spacer" style="flex:1"></div>
+    <button class="btn ghost" id="btnBig" style="padding:3px 8px">Groß</button>
+    <span id="status" class="ok">bereit</span>
+  </div>
+  <canvas id="plot"></canvas>
+  <canvas id="splane" style="display:none"></canvas>
+</div>
+</div>
+
+<div class="modal" id="mHelp"><div class="sheet">
+  <span class="eyebrow">Referenz</span>
+  <h2>Blöcke und ihre Übertragungsfunktion</h2>
+  <p class="hint">Jeder Pfad wird intern als Übertragungsfunktion G(s) in eine Zustandsraumdarstellung überführt und mit Runge–Kutta 4 im Zeitbereich integriert. Rückführungen sind erlaubt, solange in jeder Schleife mindestens ein Block ohne Durchgriff liegt (Integrator, PT1, PT2, streng proper G(s)). Beim MIMO-Block gilt das für den ganzen Block: hat <i>irgendein</i> Pfad Durchgriff, zählt der Block in jeder Schleife als durchgriffsbehaftet.</p>
+  <table id="helpTable"></table>
+  <h2 style="font-size:16px">Bedienung</h2>
+  <p class="hint">
+  Block aus der linken Spalte anklicken → er erscheint auf dem Blatt. Blöcke mit der Maus ziehen.<br>
+  <b>Verbinden:</b> einen Anschluss anklicken, dann den zweiten. Die Reihenfolge ist egal — vom Eingang zum Ausgang geht genauso wie umgekehrt.<br>
+  <b>Abzweigen:</b> von einem Eingang auf eine bestehende <b>Leitung</b> ziehen. Dort entsteht ein Verzweigungspunkt; das Signal läuft unverändert in beide Zweige. Ein Klick auf den Punkt startet eine weitere Leitung, Löschen verbindet die Leitung wieder durch.<br>
+  <b>Block einfügen:</b> einen noch unverbundenen Block auf eine Leitung ziehen — die Leitung leuchtet auf, der Block rastet ein, wird verbunden und automatisch in die Flussrichtung gedreht.<br>
+  <b>Ausrichten:</b> beim Ziehen rasten Blöcke auf der Anschlusshöhe und Mittelachse anderer Blöcke ein (gestrichelte Hilfslinie).<br>
+  <b>Mehrere Ausgänge:</b> der MIMO-Block bildet z.B. das Flugzeug mit η → γ <i>und</i> η → q ab; Anzahl der Ein-/Ausgänge und G<sub>ij</sub>(s) stellst du rechts ein.<br>
+  <b>Spiegeln:</b> Block anklicken und <kbd>F</kbd> drücken (oder Knopf rechts) — Eingang rechts, Ausgang links. So laufen Rückführungen sauber von rechts nach links.<br>
+  <b>Leitung verlegen:</b> Leitung anfassen und ziehen — sie weicht unabhängig von den Blöcken aus und <b>rastet auf der Höhe anderer Leitungen ein</b> (gestrichelte Hilfslinie). <kbd>Entf</kbd> löscht die Auswahl.<br>
+  Hintergrund ziehen = verschieben, Mausrad = zoomen. Trennleiste über dem Diagramm ziehen = Zeitverlauf größer.<br>
+  <b>Rückgängig:</b> <kbd>Strg+Z</kbd>, wiederherstellen <kbd>Strg+Y</kbd> (oder die Pfeile oben). Blöcke lassen sich auch direkt aus der Seitenleiste aufs Blatt ziehen.<br>
+  <b>s-Ebene:</b> der zweite Reiter unten zeigt die Pole des <i>Gesamtsystems</i> (×) mit Dämpfungsstrahlen und ω₀-Kreisen — genau das Pol-Diagramm aus Übung 3b. Wählst du dort eine Verstärkung aus, wird deren <b>Wurzelortskurve</b> gezeichnet: die Pole wandern von k = 0 (□, offener Kreis) bis 2·k (Pfeil); × markiert den aktuellen Wert. Hinweis: bei MIMO-Blöcken erscheinen die Nennerpole einmal je benutztem Pfad — das ist die Zustandszahl der Realisierung, nicht ein Fehler.<br>
+  Parameter rechts ändern → die Simulation läuft automatisch neu.
+  </p>
+  <button class="btn" data-close>Schließen</button>
+</div></div>
+
+<div class="modal" id="mIO"><div class="sheet">
+  <span class="eyebrow">Text-Export</span>
+  <h2>Struktur speichern oder laden</h2>
+  <p class="hint">Text kopieren und irgendwo ablegen, oder eigenen Text einfügen und „Laden“ drücken.</p>
+  <textarea id="io" spellcheck="false"></textarea>
+  <div style="margin-top:10px;display:flex;gap:8px">
+    <button class="btn" id="ioLoad">Laden</button>
+    <button class="btn ghost" data-close>Schließen</button>
+  </div>
+</div></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   1. BLOCK-DEFINITIONEN
+   ui: [key, label, min, max, step]  -> Schieberegler + Zahlenfeld
+   tf(p) -> {num:[..], den:[..]}  (absteigende Potenzen von s)
+   ========================================================================= */
+const F = (n,d,small) => `<span class="expr${small?' sm':''}"><span class="frac"><span class="n">${n}</span><span class="d">${d}</span></span></span>`;
+const E = (t,small) => `<span class="expr${small?' sm':''}">${t}</span>`;
+
+const DEFS = {
+  step:{cat:"Quellen", name:"Sprung 1(t)", ins:0, cap:"Sprung",
+    params:{A:1,t0:0}, ui:[["A","Amplitude",-10,10,.1],["t0","Startzeit t₀ [s]",0,20,.1]],
+    disp:p=>E(`${fmt(p.A)}·1(t−${fmt(p.t0)})`,true), mini:"⌐", src:(p,t)=> t>=p.t0?p.A:0,
+    help:"Testsignal Einheitssprung — Standardanregung für Sprungantworten (3.3.2)."},
+  ramp:{cat:"Quellen", name:"Rampe", ins:0, cap:"Rampe",
+    params:{a:1,t0:0}, ui:[["a","Steigung a [1/s]",-5,5,.1],["t0","Startzeit t₀ [s]",0,20,.1]],
+    disp:p=>E(`${fmt(p.a)}·t`,true), mini:"/", src:(p,t)=> t>=p.t0?p.a*(t-p.t0):0,
+    help:"Rampe a·t — prüft die Schleppfehler-Eigenschaften."},
+  sine:{cat:"Quellen", name:"Harmonische", ins:0, cap:"Sinus",
+    params:{A:1,w:1}, ui:[["A","Amplitude",0,5,.1],["w","Kreisfrequenz ω [1/s]",0.05,20,.05]],
+    disp:p=>E(`${fmt(p.A)}·sin(${fmt(p.w)}t)`,true), mini:"∿", src:(p,t)=>p.A*Math.sin(p.w*t),
+    help:"Harmonische Anregung — zeigt Amplituden- und Phasengang direkt im Zeitbereich (3.3.3)."},
+  konst:{cat:"Quellen", name:"Konstante", ins:0, cap:"Konstante",
+    params:{c:1}, ui:[["c","Wert",-10,10,.1]],
+    disp:p=>E(fmt(p.c)), mini:"c", src:p=>p.c, help:"Konstanter Wert, z.B. für eine Störgröße z."},
+
+  node:{cat:"Verknüpfung", name:"Verzweigung", shape:"node", ins:1, outs:1, cap:"", params:{}, mini:"•", round:true,
+    disp:()=>"",
+    help:"Verzweigungspunkt: das Signal läuft unverändert in jede abgehende Leitung. Entsteht auch automatisch, wenn du eine Leitung auf einer anderen enden lässt."},
+  sum:{cat:"Verknüpfung", name:"Summationsstelle", shape:"sum", ins:2, cap:"",
+    params:{s0:"+",s1:"−",s2:"+"}, signs:true, mini:"⊕", round:true,
+    help:"Additionsstelle. Vorzeichen je Eingang wählbar — das Minus erzeugt die Gegenkopplung (Regelabweichung e = w − y)."},
+
+  gain:{cat:"Regler & Glieder", name:"Verstärkung (P)", cap:"Verstärkung",
+    params:{k:1}, ui:[["k","k",-20,20,.01],
+    ], tf:p=>({num:[p.k],den:[1]}), disp:p=>E(`k = ${fmt(p.k)}`), mini:"k",
+    help:"P-Glied, G(s)=k. Reiner Durchgriff — z.B. Reglerverstärkung k<sub>ηq</sub> oder ein idealisierter Sensor (=1)."},
+  integ:{cat:"Regler & Glieder", name:"Integrator", cap:"Integrator",
+    params:{K:1}, ui:[["K","K",-5,5,.05]], tf:p=>({num:[p.K],den:[1,0]}),
+    disp:p=>F(p.K===1?"1":fmt(p.K),"s"), mini:"1/s",
+    help:"I-Glied, G(s)=K/s. Ein Integrator in der Strecke sorgt für stationäre Genauigkeit (z.B. γ → H mit 1/s)."},
+  pt1:{cat:"Regler & Glieder", name:"PT1 (Verzögerung 1. Ordn.)", cap:"PT1",
+    params:{K:1,T:1}, ui:[["K","Verstärkung K",-5,5,.05],["T","Zeitkonstante T [s]",0.01,10,.01]],
+    tf:p=>({num:[p.K],den:[p.T,1]}), disp:p=>F(fmt(p.K),`1+${fmt(p.T)}s`), mini:"PT1",
+    help:"Verzögerung 1. Ordnung K/(1+Ts). Pol bei −1/T. Typisch für Aktuator-/Servodynamik."},
+  pt2:{cat:"Regler & Glieder", name:"PT2 (Schwinger)", cap:"PT2",
+    params:{K:1,w0:1,D:0.5}, ui:[["K","Verstärkung K",-5,5,.05],["w0","Eigenfrequenz ω₀ [1/s]",0.05,10,.05],["D","Dämpfung D",-0.5,2,.01]],
+    tf:p=>({num:[p.K*p.w0*p.w0],den:[1,2*p.D*p.w0,p.w0*p.w0]}),
+    disp:p=>F(`${fmt(p.K)}ω₀²`,`s²+2Dω₀s+ω₀²`,true), mini:"PT2",
+    help:"Schwingungsglied Kω₀²/(s²+2Dω₀s+ω₀²). D<0 → instabil, D=0 → Dauerschwingung, D<1 → Überschwingen (Anstellwinkel-/Phygoid-Schwingung)."},
+  hp:{cat:"Regler & Glieder", name:"Hochpass (Washout)", cap:"Hochpass",
+    params:{T:1}, ui:[["T","Zeitkonstante T [s]",0.05,20,.05]],
+    tf:p=>({num:[p.T,0],den:[p.T,1]}), disp:p=>F(`${fmt(p.T)}s`,`1+${fmt(p.T)}s`), mini:"Ts/…",
+    help:"DT1-Hochpass Ts/(1+Ts). Lässt schnelle Bewegungen durch, blockt stationäre Anteile — deshalb im Gierdämpfer, damit der stationäre Kurvenflug nicht weggeregelt wird (5.2.1.3)."},
+  dt1:{cat:"Regler & Glieder", name:"DT1 (real. Differenzierer)", cap:"DT1",
+    params:{Td:1,T:0.1}, ui:[["Td","Vorhaltzeit T_d [s]",0,10,.05],["T","Verzögerung T [s]",0.01,5,.01]],
+    tf:p=>({num:[p.Td,0],den:[p.T,1]}), disp:p=>F(`${fmt(p.Td)}s`,`1+${fmt(p.T)}s`), mini:"DT1",
+    help:"Realisierbarer Differenzierer T_d·s/(1+Ts) — genau der D-Anteil eines realen PID-Reglers. Ein ideales D-Glied G(s)=s ist technisch nicht realisierbar (Zählergrad > Nennergrad); für Frequenzen ω ≪ 1/T wirkt das DT1 wie s·T_d. Der Hochpass ist derselbe Blocktyp mit T_d = T."},
+  pi:{cat:"Regler & Glieder", name:"PI-Regler", cap:"PI-Regler",
+    params:{K:1,Ti:1}, ui:[["K","Verstärkung K",-10,10,.05],["Ti","Nachstellzeit T_i [s]",0.01,20,.01]],
+    tf:p=>({num:[p.K*p.Ti,p.K],den:[p.Ti,0]}), disp:p=>E(`${fmt(p.K)}(1+`,true)+F("1",`${fmt(p.Ti)}s`,true)+E(")",true),
+    mini:"PI", help:"K(1+1/(T_i s)). Der I-Anteil beseitigt die bleibende Regelabweichung (Übung 4.2d)."},
+  pid:{cat:"Regler & Glieder", name:"PID-Regler", cap:"PID-Regler",
+    params:{K:1,Ti:1,Td:0.2,Tv:0.02},
+    ui:[["K","Verstärkung K",-10,10,.05],["Ti","Nachstellzeit T_i [s]",0.01,20,.01],["Td","Vorhaltzeit T_d [s]",0,5,.01],["Tv","Parasitäre Zeit T_v [s]",0.005,1,.005]],
+    tf:p=>({num:[p.K*(p.Ti*p.Tv+p.Ti*p.Td), p.K*(p.Ti+p.Tv), p.K], den:[p.Ti*p.Tv,p.Ti,0]}),
+    disp:p=>E(`${fmt(p.K)}(1+`,true)+F("1",`${fmt(p.Ti)}s`,true)+E("+",true)+F(`${fmt(p.Td)}s`,`1+${fmt(p.Tv)}s`,true)+E(")",true),
+    mini:"PID", help:"K(1 + 1/(T_i s) + T_d s/(1+T_v s)) — der D-Anteil ist mit T_v realisierbar gemacht."},
+  tf:{cat:"Regler & Glieder", name:"Freie Übertragungsfunktion", cap:"G(s)",
+    params:{num:"1",den:"1 1",name:"G(s)"},
+    text:[["num","Zähler (Koeff. absteigend)"],["den","Nenner (Koeff. absteigend)"],["name","Beschriftung"]],
+    tf:p=>({num:parseCoeffs(p.num),den:parseCoeffs(p.den)}),
+    disp:p=>F(poly(parseCoeffs(p.num)),poly(parseCoeffs(p.den)),true), mini:"G(s)",
+    help:'Beliebiges G(s). Koeffizienten mit Leerzeichen, absteigend: <code>1 2 5</code> = s²+2s+5. Damit lassen sich die Flugzeug-Übertragungsfunktionen aus den Übungen eintragen.'},
+  mtf:{cat:"Regler & Glieder", name:"Mehrgrößen-System (MIMO)", cap:"", matrix:true, ins:1, outs:2,
+    params:{name:"Flugzeug",
+      li0:"u₁",li1:"u₂",li2:"u₃", lo0:"y₁",lo1:"y₂",lo2:"y₃",
+      n00:"1",  d00:"1 1",   n01:"0", d01:"1", n02:"0", d02:"1",
+      n10:"1",  d10:"1 2 1", n11:"0", d11:"1", n12:"0", d12:"1",
+      n20:"0",  d20:"1",     n21:"0", d21:"1", n22:"1", d22:"1 1"},
+    disp:p=>E(p.name||"G(s)"), mini:"⊞",
+    help:"System mit mehreren Ein- und Ausgängen (3.4.3). Jeder Pfad Eingang j → Ausgang i bekommt sein eigenes G<sub>ij</sub>(s); zusammen ergeben sie die Übertragungsmatrix. Damit lässt sich das Flugzeug mit η → γ <i>und</i> η → q in einem Block abbilden."},
+  sat:{cat:"Regler & Glieder", name:"Begrenzung (Stellgrenze)", cap:"Begrenzung",
+    params:{lo:-1,hi:1}, ui:[["lo","Untere Grenze",-20,20,.1],["hi","Obere Grenze",-20,20,.1]],
+    disp:()=>E("⌐‾"), mini:"⌐‾", nonlin:true,
+    help:"Stellgrößenbegrenzung — nichtlinear. Zeigt, warum „technische Realisierbarkeit“ ein Entwurfsziel ist (3.5)."},
+
+  scope:{cat:"Ausgang", name:"Anzeige", ins:1, outs:0, cap:"",
+    params:{name:"y"}, text:[["name","Signalname"]],
+    disp:p=>E(p.name||"y"), mini:"▣",
+    help:"Zeichnet das anliegende Signal in den Plot unten. Beliebig viele Anzeigen möglich."}
+};
+for(const k in DEFS){const d=DEFS[k]; d.key=k; if(d.ins===undefined)d.ins=1; if(d.outs===undefined)d.outs=1;}
+
+function fmt(v){ if(typeof v!=="number"||!isFinite(v)) return String(v);
+  const a=Math.abs(v); if(v===0) return "0";
+  if(a>=1e4||a<1e-3) return v.toExponential(2).replace("e","·10^");
+  return String(Math.round(v*1e4)/1e4); }
+function parseCoeffs(s){ return String(s).trim().split(/[\s,;]+/).filter(x=>x!=="").map(Number).map(v=>isFinite(v)?v:0); }
+function poly(c){ c=c.slice(); while(c.length>1&&c[0]===0)c.shift();
+  const n=c.length-1; let out=[];
+  for(let i=0;i<c.length;i++){ const p=n-i, v=c[i]; if(v===0&&c.length>1) continue;
+    let t=""; const av=Math.abs(v);
+    if(p===0) t=fmt(av); else { t=(av===1?"":fmt(av))+"s"+(p>1?sup(p):""); }
+    out.push((out.length? (v<0?" − ":" + ") : (v<0?"−":""))+t); }
+  return out.length?out.join(""):"0"; }
+function sup(n){ const m={0:"⁰",1:"¹",2:"²",3:"³",4:"⁴",5:"⁵",6:"⁶",7:"⁷",8:"⁸",9:"⁹"}; return String(n).split("").map(c=>m[c]).join(""); }
+
+/* =========================================================================
+   2. MATHEMATIK: TF -> Zustandsraum, Wurzeln, Simulation
+   ========================================================================= */
+function strip(a){ a=a.slice(); while(a.length>1&&Math.abs(a[0])<1e-14)a.shift(); return a; }
+
+function ssFromTF(num,den){
+  num=strip(num); den=strip(den);
+  if(den.length===1&&Math.abs(den[0])<1e-14) throw new Error("Nenner ist 0");
+  const n=den.length-1;
+  if(num.length-1>n) throw new Error("Zählergrad > Nennergrad — nicht realisierbar");
+  const a0=den[0]; den=den.map(v=>v/a0); num=num.map(v=>v/a0);
+  const b=new Array(n+1).fill(0);
+  for(let i=0;i<num.length;i++) b[n+1-num.length+i]=num[i];
+  if(n===0) return {n:0,a:[],c:[],D:b[0]};
+  const D=b[0];
+  if(D!==0) for(let i=0;i<=n;i++) b[i]-=D*den[i];
+  const a=den.slice(1);
+  const c=[]; for(let i=0;i<n;i++) c[i]=b[n-i];
+  return {n,a,c,D};
+}
+/* Durand–Kerner: Wurzeln eines Polynoms (absteigende Koeffizienten) */
+function roots(coef){
+  let c=strip(coef); const n=c.length-1; if(n<1) return [];
+  c=c.map(v=>v/c[0]);
+  let z=[]; for(let i=0;i<n;i++){ const ang=2*Math.PI*i/n+0.5; z.push({re:0.4*Math.cos(ang)+0.9*Math.cos(ang),im:0.9*Math.sin(ang)}); }
+  const ev=(x)=>{ let r={re:0,im:0}; for(let i=0;i<c.length;i++){ r=cadd(cmul(r,x),{re:c[i],im:0}); } return r; };
+  for(let it=0;it<600;it++){ let maxd=0;
+    for(let i=0;i<n;i++){ let d={re:1,im:0};
+      for(let j=0;j<n;j++) if(j!==i) d=cmul(d,csub(z[i],z[j]));
+      if(cabs(d)<1e-18) continue;
+      const dz=cdiv(ev(z[i]),d); z[i]=csub(z[i],dz); maxd=Math.max(maxd,cabs(dz)); }
+    if(maxd<1e-12) break; }
+  return z.map(v=>({re:Math.abs(v.re)<1e-9?0:v.re, im:Math.abs(v.im)<1e-9?0:v.im}));
+}
+const cadd=(a,b)=>({re:a.re+b.re,im:a.im+b.im});
+const csub=(a,b)=>({re:a.re-b.re,im:a.im-b.im});
+const cmul=(a,b)=>({re:a.re*b.re-a.im*b.im,im:a.re*b.im+a.im*b.re});
+const cabs=a=>Math.hypot(a.re,a.im);
+function cdiv(a,b){ const d=b.re*b.re+b.im*b.im; return {re:(a.re*b.re+a.im*b.im)/d, im:(a.im*b.re-a.re*b.im)/d}; }
+function polyval(c,x){ let r={re:0,im:0}; for(let i=0;i<c.length;i++) r=cadd(cmul(r,x),{re:c[i],im:0}); return r; }
+
+/* --- Modell übersetzen ---
+   Ausgänge sind Arrays: o[blockId][portIndex]. Kanten: {from,fromPort,to,port} */
+function compile(model){
+  const warn=[]; const nodes=new Map();
+  for(const b of model.blocks){
+    const d=DEFS[b.type];
+    const nd={id:b.id,type:b.type,def:d,block:b,n:0,off:0,feed:true,nout:b.outs||d.outs||1};
+    if(d.src){ nd.kind="src"; nd.feed=false; }
+    else if(d.shape==="sum"){ nd.kind="sum"; }
+    else if(d.shape==="node"){ nd.kind="node"; }
+    else if(d.nonlin){ nd.kind="sat"; }
+    else if(d.key==="scope"){ nd.kind="scope"; }
+    else if(d.matrix){
+      nd.kind="mtf"; nd.sub=[]; let feed=false;
+      for(let i=0;i<(b.outs||1);i++){ nd.sub[i]=[];
+        for(let j=0;j<(b.ins||1);j++){
+          const num=strip(parseCoeffs(b.params["n"+i+j]||"0")), den=parseCoeffs(b.params["d"+i+j]||"1");
+          if(!num.length||num.every(v=>v===0)){ nd.sub[i][j]=null; continue; }
+          let ss; try{ ss=ssFromTF(num,den); }
+          catch(err){ throw new Error(`${b.params.name||"MIMO"} · G(${b.params["lo"+i]}/${b.params["li"+j]}): ${err.message}`); }
+          nd.sub[i][j]=ss; nd.n+=ss.n; if(Math.abs(ss.D)>1e-15) feed=true;
+        } }
+      nd.feed=feed;
+    }
+    else { nd.kind="sys"; const {num,den}=d.tf(b.params); const ss=ssFromTF(num,den);
+      Object.assign(nd,{n:ss.n,a:ss.a,c:ss.c,D:ss.D}); nd.feed=Math.abs(ss.D)>1e-15; }
+    nodes.set(b.id,nd);
+  }
+  let off=0;
+  for(const nd of nodes.values()){ nd.off=off;
+    if(nd.kind==="mtf"){ for(const row of nd.sub) for(const ss of row) if(ss){ ss.off=off; off+=ss.n; } }
+    else off+=nd.n; }
+  const NX=off;
+  const inc=new Map(); for(const id of nodes.keys()) inc.set(id,[]);
+  for(const e of model.edges){ if(!nodes.has(e.from)||!nodes.has(e.to)) continue;
+    inc.get(e.to)[e.port||0]={b:e.from,p:e.fromPort||0}; }
+  const need=[...nodes.values()].filter(n=>n.kind!=="src" && (n.feed||n.kind==="sum"||n.kind==="sat"||n.kind==="scope"||n.kind==="node"));
+  const inSet=new Set(need.map(n=>n.id));
+  const deg=new Map(need.map(n=>[n.id,0])), adj=new Map(need.map(n=>[n.id,[]]));
+  for(const n of need) for(const src of (inc.get(n.id)||[])) if(src&&inSet.has(src.b)){ deg.set(n.id,deg.get(n.id)+1); adj.get(src.b).push(n.id); }
+  const q=need.filter(n=>deg.get(n.id)===0).map(n=>n.id); const topo=[];
+  while(q.length){ const id=q.shift(); topo.push(nodes.get(id));
+    for(const t of adj.get(id)){ deg.set(t,deg.get(t)-1); if(deg.get(t)===0) q.push(t); } }
+  if(topo.length!==need.length) warn.push("Algebraische Schleife: eine Rückführung enthält nur Blöcke mit Durchgriff (P, Summe, Hochpass …). Setze mindestens ein verzögerndes Glied (1/s, PT1, PT2) in die Schleife.");
+  return {nodes,inc,topo,NX,warn,list:[...nodes.values()]};
+}
+function mtfOut(nd,X,u){
+  const out=[];
+  for(let i=0;i<nd.sub.length;i++){ let y=0;
+    for(let j=0;j<nd.sub[i].length;j++){ const ss=nd.sub[i][j]; if(!ss) continue;
+      for(let k=0;k<ss.n;k++) y+=ss.c[k]*X[ss.off+k];
+      if(ss.D&&u) y+=ss.D*u(j); }
+    out.push(y); }
+  return out;
+}
+function outputs(c,X,t,zeroSrc){
+  const o={};
+  for(const nd of c.list){
+    if(nd.kind==="src") o[nd.id]=[zeroSrc?0:nd.def.src(nd.block.params,t)];
+    else if(nd.kind==="sys"&&!nd.feed){ let y=0; for(let i=0;i<nd.n;i++) y+=nd.c[i]*X[nd.off+i]; o[nd.id]=[y]; }
+    else if(nd.kind==="mtf"&&!nd.feed) o[nd.id]=mtfOut(nd,X,null);
+  }
+  for(const nd of c.topo){
+    const src=c.inc.get(nd.id)||[];
+    const u=i=>{ const s=src[i]; if(!s) return 0; const a=o[s.b]; return a?(a[s.p]||0):0; };
+    if(nd.kind==="sys"){ let y=nd.D*u(0); for(let i=0;i<nd.n;i++) y+=nd.c[i]*X[nd.off+i]; o[nd.id]=[y]; }
+    else if(nd.kind==="mtf") o[nd.id]=mtfOut(nd,X,u);
+    else if(nd.kind==="sum"){ const p=nd.block.params; let y=0;
+      for(let i=0;i<(nd.block.ins||2);i++) y+=(p["s"+i]==="−"?-1:1)*u(i); o[nd.id]=[y]; }
+    else if(nd.kind==="sat"){ const p=nd.block.params; o[nd.id]=[Math.min(Math.max(u(0),Math.min(p.lo,p.hi)),Math.max(p.lo,p.hi))]; }
+    else o[nd.id]=[u(0)];   /* node, scope */
+  }
+  return o;
+}
+function derivs(c,X,t,dX,zeroSrc){
+  const o=outputs(c,X,t,zeroSrc);
+  dX.fill(0);
+  const step=(ss,u)=>{ const off=ss.off,n=ss.n; if(!n) return;
+    for(let i=0;i<n-1;i++) dX[off+i]=X[off+i+1];
+    let acc=u; for(let i=0;i<n;i++) acc-=ss.a[n-1-i]*X[off+i];
+    dX[off+n-1]=acc; };
+  for(const nd of c.list){
+    const src=c.inc.get(nd.id)||[];
+    const u=i=>{ const s=src[i]; if(!s) return 0; const a=o[s.b]; return a?(a[s.p]||0):0; };
+    if(nd.kind==="sys"&&nd.n) step({off:nd.off,n:nd.n,a:nd.a},u(0));
+    else if(nd.kind==="mtf") for(let i=0;i<nd.sub.length;i++) for(let j=0;j<nd.sub[i].length;j++){ const ss=nd.sub[i][j]; if(ss&&ss.n) step(ss,u(j)); }
+  }
+  return o;
+}
+/* Systemmatrix des linearisierten Gesamtsystems (Quellen = 0, Begrenzung ≈ 1)
+   spaltenweise über derivs; Eigenwerte über Faddeev–LeVerrier + Durand–Kerner. */
+function sysPoles(model){
+  const c=compile(model);
+  if(c.warn.length) throw new Error(c.warn[0]);
+  const n=c.NX;
+  if(n===0) return {poles:[],n:0};
+  if(n>18) throw new Error("System zu groß für die Polberechnung ("+n+" Zustände)");
+  const M=[], X=new Float64Array(n), dX=new Float64Array(n);
+  for(let j=0;j<n;j++){ X.fill(0); X[j]=1; derivs(c,X,0,dX,true); M.push(Array.from(dX)); }
+  /* M[j] ist Spalte j -> A[i][j]=M[j][i] */
+  const A=[]; for(let i=0;i<n;i++){ A.push([]); for(let j=0;j<n;j++) A[i][j]=M[j][i]; }
+  /* Faddeev–LeVerrier: p(λ)=λ^n + c1 λ^{n-1} + … + cn */
+  const I=(k)=>{ const r=[]; for(let i=0;i<n;i++){ r.push([]); for(let j=0;j<n;j++) r[i][j]=(i===j?k:0); } return r; };
+  const mul=(P,Q)=>{ const R=I(0); for(let i=0;i<n;i++) for(let k=0;k<n;k++){ const v=P[i][k]; if(!v) continue;
+      for(let j=0;j<n;j++) R[i][j]+=v*Q[k][j]; } return R; };
+  const add=(P,Q)=>P.map((r,i)=>r.map((v,j)=>v+Q[i][j]));
+  const tr=P=>{ let t=0; for(let i=0;i<n;i++) t+=P[i][i]; return t; };
+  let Mk=A.map(r=>r.slice()); const coef=[1];
+  for(let k=1;k<=n;k++){
+    const ck=-tr(Mk)/k; coef.push(ck);
+    if(k<n) Mk=mul(A,add(Mk,I(ck)));
+  }
+  return {poles:roots(coef),n,hasSat:model.blocks.some(b=>DEFS[b.type].nonlin)};
+}
+function simulate(model,T){
+  const c=compile(model);
+  const scopes=c.list.filter(n=>n.kind==="scope");
+  const steps=4000, dt=T/steps, every=Math.max(1,Math.round(steps/1400));
+  let X=new Float64Array(c.NX);
+  const k1=new Float64Array(c.NX),k2=new Float64Array(c.NX),k3=new Float64Array(c.NX),k4=new Float64Array(c.NX),tmp=new Float64Array(c.NX);
+  const ts=[], data=scopes.map(()=>[]);
+  let unstable=false;
+  const rec=(t)=>{ const o=outputs(c,X,t); ts.push(t); scopes.forEach((s,i)=>data[i].push((o[s.id]||[0])[0])); };
+  rec(0);
+  for(let k=0;k<steps;k++){
+    const t=k*dt;
+    derivs(c,X,t,k1);
+    for(let i=0;i<c.NX;i++) tmp[i]=X[i]+dt/2*k1[i]; derivs(c,tmp,t+dt/2,k2);
+    for(let i=0;i<c.NX;i++) tmp[i]=X[i]+dt/2*k2[i]; derivs(c,tmp,t+dt/2,k3);
+    for(let i=0;i<c.NX;i++) tmp[i]=X[i]+dt*k3[i];   derivs(c,tmp,t+dt,k4);
+    for(let i=0;i<c.NX;i++) X[i]+=dt/6*(k1[i]+2*k2[i]+2*k3[i]+k4[i]);
+    for(let i=0;i<c.NX;i++) if(!isFinite(X[i])||Math.abs(X[i])>1e14){ unstable=true; break; }
+    if(unstable) break;
+    if((k+1)%every===0) rec((k+1)*dt);
+  }
+  return {ts,data,names:scopes.map(s=>s.block.params.name||"y"),warn:c.warn,unstable,compiled:c};
+}
+
+/* =========================================================================
+   3. MODELL + RENDERING
+   ========================================================================= */
+let model={blocks:[],edges:[],next:1};
+let sel=null, selEdge=null, arm=null, hlEdge=null, snapGuide=null, view={x:40,y:40,k:1};
+const $=s=>document.querySelector(s);
+const blocksEl=$("#blocks"), wiresEl=$("#wires"), stage=$("#stage"), world=$("#world");
+
+function addBlock(type,x,y,params,ins){
+  const d=DEFS[type];
+  const b={id:model.next++,type,x:Math.round(x),y:Math.round(y),ins:ins||d.ins,outs:d.outs,flip:false,params:Object.assign({},d.params,params||{})};
+  model.blocks.push(b); return b;
+}
+/* fehlende Felder ergänzen (ältere gespeicherte Strukturen) */
+function normalize(m){
+  m.blocks=(m.blocks||[]).filter(b=>DEFS[b.type]);
+  for(const b of m.blocks){ const d=DEFS[b.type];
+    b.ins=b.ins||d.ins; b.outs=b.outs||d.outs; b.flip=!!b.flip;
+    b.params=Object.assign({},d.params,b.params||{}); }
+  m.edges=(m.edges||[]).filter(e=>m.blocks.some(b=>b.id===e.from)&&m.blocks.some(b=>b.id===e.to));
+  for(const e of m.edges){ e.fromPort=e.fromPort||0; e.port=e.port||0; }
+  m.next=Math.max(1,...m.blocks.map(b=>b.id+1));
+  return m;
+}
+function connect(a,b,port){ model.edges=model.edges.filter(e=>!(e.to===b&&e.port===(port||0))); model.edges.push({from:a,to:b,port:port||0}); }
+function flipBlock(b){ b.flip=!b.flip; for(const e of model.edges) if(e.from===b.id||e.to===b.id){ delete e.m; delete e.fam; } render(); inspector(); commit(); }
+function delBlock(id){
+  const b=model.blocks.find(x=>x.id===id);
+  if(b&&DEFS[b.type].shape==="node"){   /* Verzweigung: Leitung wieder durchverbinden */
+    const inE=model.edges.find(e=>e.to===id);
+    if(inE) for(const o of model.edges) if(o.from===id){ o.from=inE.from; o.fromPort=inE.fromPort||0; delete o.m; delete o.fam; }
+  }
+  model.blocks=model.blocks.filter(x=>x.id!==id);
+  model.edges=model.edges.filter(e=>e.from!==id&&e.to!==id);
+  if(sel===id)sel=null; selEdge=null;
+}
+
+const SIZE=b=>{ const d=DEFS[b.type];
+  if(d.shape==="sum") return {w:34,h:34};
+  if(d.shape==="node") return {w:12,h:12};
+  if(d.matrix) return {w:120,h:Math.max(58,24*(Math.max(b.ins||1,b.outs||1)+1))};
+  return {w:112,h:58}; };
+const BOT=b=>b.y+SIZE(b).h;
+/* Ports: Summationsstelle -> 0 = Sollwertseite, 1 = unten (Rückführung), 2 = oben.
+   b.flip spiegelt Ein-/Ausgang. Verzweigung: ein Punkt, der Ein- und Ausgang zugleich ist. */
+function portPos(b,kind,i){
+  const s=SIZE(b), fl=!!b.flip, d=DEFS[b.type];
+  if(d.shape==="node") return {x:b.x+s.w/2,y:b.y+s.h/2,dir:"N"};
+  if(kind==="out"){
+    const n=b.outs||1, y=b.y+s.h*(i+1)/(n+1);
+    return fl?{x:b.x,y,dir:"L"}:{x:b.x+s.w,y,dir:"R"};
+  }
+  if(d.shape==="sum"){
+    if(i===0) return fl?{x:b.x+s.w,y:b.y+s.h/2,dir:"R"}:{x:b.x,y:b.y+s.h/2,dir:"L"};
+    if(i===1) return {x:b.x+s.w/2,y:b.y+s.h,dir:"B"};
+    return {x:b.x+s.w/2,y:b.y,dir:"T"};
+  }
+  const n=b.ins||1, y=b.y+s.h*(i+1)/(n+1);
+  return fl?{x:b.x+s.w,y,dir:"R"}:{x:b.x,y,dir:"L"};
+}
+const PORTNAME={L:"links",R:"rechts",T:"oben",B:"unten",N:"Punkt"};
+function render(){
+  blocksEl.innerHTML="";
+  for(const b of model.blocks){
+    const d=DEFS[b.type], s=SIZE(b);
+    const el=document.createElement("div");
+    el.className="blk"+(d.shape==="sum"?" sum":"")+(d.shape==="node"?" node":"")+(sel===b.id?" sel":"");
+    el.style.left=b.x+"px"; el.style.top=b.y+"px"; el.style.width=s.w+"px"; el.style.height=s.h+"px";
+    el.dataset.id=b.id;
+    const cap=(b.type==="tf"?b.params.name:d.cap)||"";
+    el.innerHTML=`${cap?`<div class="cap">${esc(cap)}</div>`:""}<div class="body">${d.shape==="sum"||d.shape==="node"?"":d.disp(b.params)}</div>`;
+    const body=el.querySelector(".body");
+    if(d.shape==="sum") body.innerHTML=`<svg width="34" height="34" style="display:block"><line x1="17" y1="3" x2="17" y2="31" stroke="var(--ink)" stroke-width="1.2"/><line x1="3" y1="17" x2="31" y2="17" stroke="var(--ink)" stroke-width="1.2"/></svg>`;
+    if(d.shape==="node"){ body.classList.add("port"); body.dataset.kind="node"; body.dataset.id=b.id; body.dataset.port=0; }
+    else{
+      for(let i=0;i<(b.ins||0);i++){
+        const p=portPos(b,"in",i), po=document.createElement("div");
+        po.className="port"+(arm&&arm.id===b.id&&arm.kind==="in"&&arm.port===i?" armed":"");
+        po.dataset.kind="in"; po.dataset.id=b.id; po.dataset.port=i;
+        po.style.left=(p.x-b.x)+"px"; po.style.top=(p.y-b.y)+"px"; el.appendChild(po);
+        if(d.signs){ const sg=document.createElement("div"); sg.className="psign"; sg.textContent=b.params["s"+i]||"+";
+          const dx=(p.dir==="L"?-11:11), dy=(p.dir==="B"?11:-11);
+          sg.style.left=(p.x-b.x+dx)+"px"; sg.style.top=(p.y-b.y+dy)+"px"; el.appendChild(sg); }
+        if(d.matrix) el.appendChild(plab(b,p,b.params["li"+i]));
+      }
+      for(let i=0;i<(b.outs||0);i++){
+        const p=portPos(b,"out",i), po=document.createElement("div");
+        po.className="port"+(arm&&arm.id===b.id&&arm.kind==="out"&&arm.port===i?" armed":"");
+        po.dataset.kind="out"; po.dataset.id=b.id; po.dataset.port=i;
+        po.style.left=(p.x-b.x)+"px"; po.style.top=(p.y-b.y)+"px"; el.appendChild(po);
+        if(d.matrix) el.appendChild(plab(b,p,b.params["lo"+i]));
+      }
+    }
+    blocksEl.appendChild(el);
+  }
+  drawWires();
+  world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.k})`;
+}
+function plab(b,p,txt){
+  const e=document.createElement("div"); e.className="plab"; e.textContent=txt||"";
+  const left=p.dir==="L";
+  e.style.left=(p.x-b.x+(left?-9:9))+"px"; e.style.top=(p.y-b.y)+"px";
+  e.style.transform=left?"translate(-100%,-50%)":"translate(0,-50%)";
+  return e;
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* Orthogonale Leitungsführung.
+   Familie "V": senkrechtes Zwischenstück bei x = m   (Vorwärtsweg)
+   Familie "H": waagerechtes Zwischenstück bei y = m  (Rückführung, Abzweig)
+   e.m / e.fam speichern die vom Benutzer gezogene Lage. */
+function routeEdge(A,B,e){
+  const s=portPos(A,"out",e.fromPort||0), t=portPos(B,"in",e.port||0);
+  const sdir = s.dir==="N" ? (t.x>=s.x?"R":"L") : s.dir;
+  const tdir = t.dir==="N" ? (s.x<=t.x?"L":"R") : t.dir;
+  const dOut=sdir==="R"?1:-1;
+  const dIn=tdir==="L"?1:(tdir==="R"?-1:0);
+  let a=18,b=18;
+  if(dIn&&dOut===dIn){ const g=(t.x-s.x)*dOut; if(g>6) a=b=Math.min(18,g/2-0.5); }
+  if(s.dir==="N") a=0;
+  if(t.dir==="N") b=0;
+  const E={x:s.x+dOut*a,y:s.y};
+  const P= dIn? {x:t.x-dIn*b, y:t.y} : {x:t.x, y:t.y+(tdir==="T"?-26:26)};
+  let fam,def;
+  const drop=Math.abs(P.y-E.y)>16;
+  if(dIn && dOut===dIn && (P.x-E.x)*dOut>-8 && !(s.dir==="N"&&drop)){ fam="V"; def=(E.x+P.x)/2; }
+  else{
+    fam="H";
+    if(dIn===0){
+      if(tdir==="B") def=(E.y>P.y+8)?E.y:Math.max(BOT(A),BOT(B))+34;
+      else           def=(E.y<P.y-8)?E.y:Math.min(A.y,B.y)-34;
+    }
+    /* Abzweig: senkrecht auf die Höhe des Ziels, dann waagerecht hinein */
+    else if(drop && (Math.sign(P.x-E.x)===dIn || Math.abs(P.x-E.x)<1)) def=P.y;
+    else if(dOut!==dIn) def=E.y;
+    else def=Math.max(BOT(A),BOT(B))+34;
+  }
+  const m=(e.fam===fam&&typeof e.m==="number")?e.m:def;
+  const pts=[{x:s.x,y:s.y},E];
+  if(fam==="V") pts.push({x:m,y:E.y},{x:m,y:P.y});
+  else          pts.push({x:E.x,y:m},{x:P.x,y:m});
+  pts.push(P,{x:t.x,y:t.y});
+  const cl=[pts[0]];
+  for(let i=1;i<pts.length;i++){ const q=cl[cl.length-1],p=pts[i]; if(Math.abs(p.x-q.x)>0.5||Math.abs(p.y-q.y)>0.5) cl.push(p); }
+  let d=`M ${cl[0].x} ${cl[0].y}`;
+  for(let i=1;i<cl.length-1;i++){
+    const p=cl[i-1],c=cl[i],n=cl[i+1];
+    const v1=norm(c,p),v2=norm(c,n);
+    const r=Math.min(7,dist(p,c)/2,dist(c,n)/2);
+    d+=` L ${c.x+v1.x*r} ${c.y+v1.y*r} Q ${c.x} ${c.y} ${c.x+v2.x*r} ${c.y+v2.y*r}`;
+  }
+  const last=cl[cl.length-1];
+  d+=` L ${last.x} ${last.y}`;
+  const prev=cl[cl.length-2]||cl[0];
+  const handle = fam==="V" ? {x:m,y:(E.y+P.y)/2,axis:"x"} : {x:(E.x+P.x)/2,y:m,axis:"y"};
+  const segs=[]; for(let i=1;i<cl.length;i++) segs.push({a:cl[i-1],b:cl[i]});
+  return {d,fam,m,handle,segs,tip:last,dirv:norm(last,prev)};
+}
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function norm(from,to){ const dx=to.x-from.x,dy=to.y-from.y,l=Math.hypot(dx,dy)||1; return {x:dx/l,y:dy/l}; }
+/* Punkt auf Strecke projizieren */
+function projSeg(p,s){
+  const dx=s.b.x-s.a.x, dy=s.b.y-s.a.y, L=dx*dx+dy*dy;
+  let u=L?((p.x-s.a.x)*dx+(p.y-s.a.y)*dy)/L:0; u=Math.max(0,Math.min(1,u));
+  const q={x:s.a.x+u*dx,y:s.a.y+u*dy};
+  return {q,d:Math.hypot(p.x-q.x,p.y-q.y)};
+}
+/* nächstgelegene Leitung zu einem Punkt; skip = Block-Id, deren Kanten ignoriert werden */
+function nearestEdge(p,maxD,skip){
+  let best=null;
+  model.edges.forEach((e,i)=>{
+    if(skip!==undefined&&(e.from===skip||e.to===skip)) return;
+    if(!e._r) return;
+    for(const sg of e._r.segs){ const r=projSeg(p,sg);
+      if(r.d<maxD&&(!best||r.d<best.d)) best={i,e,d:r.d,q:r.q,seg:sg}; }
+  });
+  return best;
+}
+
+function drawWires(ghost){
+  let h="";
+  const byId=new Map(model.blocks.map(b=>[b.id,b]));
+  model.edges.forEach((e,idx)=>{
+    const A=byId.get(e.from),B=byId.get(e.to); if(!A||!B) return;
+    let r; try{ r=routeEdge(A,B,e); }catch(err){ return; }
+    e._r=r;
+    const on=selEdge===idx, hl=hlEdge===idx;
+    const a=portPos(A,"out",e.fromPort||0);
+    h+=`<path class="wire${on?" sel":""}${hl?" hl":""}" d="${r.d}"/>`;
+    if(DEFS[B.type].shape!=="node"){   /* kein Pfeil in einen Verzweigungspunkt */
+      const ax=r.tip.x+r.dirv.x*9, ay=r.tip.y+r.dirv.y*9, px=-r.dirv.y, py=r.dirv.x;
+      h+=`<path fill="${hl?"var(--dial)":on?"var(--dial)":"var(--ink)"}" stroke="none" d="M ${r.tip.x} ${r.tip.y} L ${ax+px*3.6} ${ay+py*3.6} L ${ax-px*3.6} ${ay-py*3.6} Z"/>`;
+    }
+    if(DEFS[A.type].shape!=="node") h+=`<circle cx="${a.x}" cy="${a.y}" r="2.6" fill="var(--ink)"/>`;
+    h+=`<path class="hit" data-edge="${idx}" d="${r.d}"/>`;
+    if(on) h+=`<circle class="handle" data-edge="${idx}" cx="${r.handle.x}" cy="${r.handle.y}" r="4.5"/>`;
+  });
+  if(snapGuide){
+    let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+    for(const b of model.blocks){ const s=SIZE(b); x0=Math.min(x0,b.x); y0=Math.min(y0,b.y); x1=Math.max(x1,b.x+s.w); y1=Math.max(y1,b.y+s.h); }
+    const g=snapGuide;
+    h+= g.axis==="y"
+      ? `<line class="guide" x1="${x0-50}" y1="${g.v}" x2="${x1+50}" y2="${g.v}"/>`
+      : `<line class="guide" x1="${g.v}" y1="${y0-50}" x2="${g.v}" y2="${y1+50}"/>`;
+  }
+  if(ghost) h+=`<path class="wire ghost" d="M ${ghost.a.x} ${ghost.a.y} L ${ghost.b.x} ${ghost.b.y}"/>`;
+  wiresEl.innerHTML=h;
+}
+
+/* ---------- Palette ---------- */
+function buildPalette(){
+  const cats={};
+  for(const k in DEFS){ (cats[DEFS[k].cat]=cats[DEFS[k].cat]||[]).push(DEFS[k]); }
+  let h="";
+  for(const c in cats){
+    h+=`<div class="sec"><h3>${c}</h3>`;
+    for(const d of cats[c]) h+=`<button class="pal-item" data-add="${d.key}"><span class="mini${d.round?" round":""}">${d.mini}</span><span>${d.name}</span></button>`;
+    h+="</div>";
+  }
+  $("#palette").innerHTML=h;
+}
+
+/* ---------- Inspector ---------- */
+function anaHTML(b){
+  const d=DEFS[b.type];
+  try{
+    if(d.matrix){
+      let h=`<h3>Übertragungsmatrix</h3>`;
+      let ps=[];
+      for(let i=0;i<b.outs;i++) for(let j=0;j<b.ins;j++){
+        const num=strip(parseCoeffs(b.params["n"+i+j]||"0")), den=strip(parseCoeffs(b.params["d"+i+j]||"1"));
+        if(!num.length||num.every(v=>v===0)) continue;
+        ssFromTF(num,den);
+        ps=ps.concat(roots(den));
+        h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+             <span style="font-family:var(--f-mono);font-size:11px;color:var(--ink2);white-space:nowrap">${esc(b.params["lo"+i])}/${esc(b.params["li"+j])}</span>
+             <div class="gline" style="flex:1;min-height:34px">${F(poly(num),poly(den),true)}</div></div>`;
+      }
+      const stab=ps.length&&ps.every(p=>p.re<-1e-9);
+      h+=`<div class="rootlist" style="margin-top:8px"><div>Pole (alle Pfade): ${ps.length?ps.map(cstr).join(", "):"—"}</div>
+          <div style="margin-top:6px">${ps.length?`<span class="tag ${stab?"ok":"bad"}">${stab?"stabil":"instabil"}</span>`:""}</div></div>`;
+      return h;
+    }
+    if(!d.tf) return "";
+    const {num,den}=d.tf(b.params);
+    const zs=roots(num), ps=roots(den);
+    const stab=ps.every(p=>p.re<-1e-9);
+    return `<h3>Analyse dieses Blocks</h3>
+      <div class="gline">${F(poly(strip(num)),poly(strip(den)),true)}</div>
+      <div class="rootlist" style="margin-top:8px">
+        <div>Pole: ${ps.length?ps.map(cstr).join(", "):"—"}</div>
+        <div>Nullstellen: ${zs.length?zs.map(cstr).join(", "):"—"}</div>
+        <div style="margin-top:6px">${strip(den).length>1?`<span class="tag ${stab?"ok":"bad"}">${stab?"stabil":"instabil"}</span> <span class="hint">alle Pole Re&lt;0?</span>`:""}</div>
+      </div>
+      <h3 style="margin-top:12px">Bode (nur dieser Block)</h3><canvas id="bode"></canvas>`;
+  }catch(err){ return `<span class="tag bad">Fehler</span><p class="hint">${esc(err.message)}</p>`; }
+}
+function inspector(){
+  const el=$("#inspector");
+  if(selEdge!=null && model.edges[selEdge]){
+    const e=model.edges[selEdge], byId=new Map(model.blocks.map(x=>[x.id,x]));
+    const A=byId.get(e.from),B=byId.get(e.to);
+    const nm=(x,kind,i)=>{ if(!x) return "?"; const d=DEFS[x.type];
+      if(d.matrix) return (x.params.name||"MIMO")+" · "+(kind==="out"?x.params["lo"+i]:x.params["li"+i]);
+      if(d.shape==="node") return "Verzweigung";
+      return (x.type==="tf"?x.params.name:d.cap)||d.name; };
+    el.innerHTML=`<div class="sec"><h3>Leitung</h3>
+      <div style="font-family:var(--f-mono);font-size:12.5px;margin-bottom:8px">${esc(nm(A,"out",e.fromPort||0))} &nbsp;→&nbsp; ${esc(nm(B,"in",e.port||0))}${B&&B.ins>1&&!DEFS[B.type].matrix?` (${PORTNAME[portPos(B,"in",e.port||0).dir]})`:""}</div>
+      <p class="hint">Leitung greifen und ziehen — sie weicht unabhängig von den Blöcken aus und rastet auf der Höhe anderer Leitungen ein. Der Punkt markiert den beweglichen Abschnitt.<br><br>Von einem Eingang auf diese Leitung ziehen erzeugt eine Verzweigung.</p></div>
+      <div class="sec"><button class="btn ghost" id="eReset" style="width:100%;margin-bottom:6px">Verlauf zurücksetzen</button>
+      <button class="btn ghost" id="eDel" style="width:100%">Leitung löschen</button></div>`;
+    $("#eReset").addEventListener("click",()=>{ delete e.m; delete e.fam; render(); commit(); });
+    $("#eDel").addEventListener("click",()=>{ model.edges.splice(selEdge,1); selEdge=null; render(); inspector(); run(); commit(); });
+    return;
+  }
+  const b=model.blocks.find(x=>x.id===sel);
+  if(!b){ el.innerHTML=`<div class="sec"><h3>Auswahl</h3><p class="hint">Kein Block ausgewählt.<br><br>
+    <b>Verbinden:</b> Anschluss anklicken, dann den zweiten — Reihenfolge egal, Eingang → Ausgang geht genauso.<br>
+    <b>Abzweigen:</b> von einem Eingang auf eine bestehende Leitung ziehen; dort entsteht ein Verzweigungspunkt.<br>
+    <b>Einfügen:</b> einen freien Block auf eine Leitung ziehen — er rastet ein und ist verbunden.<br>
+    <b>Spiegeln:</b> Block wählen, Taste <b>F</b>.</p></div>`; return; }
+  const d=DEFS[b.type];
+  let h=`<div class="sec"><h3>${d.cat}</h3><div style="font-family:var(--f-disp);font-weight:600;font-size:15px;margin-bottom:6px">${d.name}</div><p class="hint">${d.help}</p>
+    ${d.shape==="node"?"":`<button class="btn ghost" data-flip style="width:100%;margin-top:8px">${b.flip?"↦ Zurückdrehen (Eingang links)":"↤ Spiegeln (Eingang rechts)"}</button>`}</div>`;
+  if(d.ui||d.text||d.signs||d.matrix){
+    h+=`<div class="sec"><h3>Parameter</h3>`;
+    if(d.ui) for(const [k,lab,mn,mx,st] of d.ui){
+      h+=`<div class="prow"><div class="lab"><span>${lab}</span><input type="number" data-num="${k}" value="${b.params[k]}" step="${st}"></div>
+          <input type="range" data-rng="${k}" min="${mn}" max="${mx}" step="${st}" value="${b.params[k]}"></div>`;
+    }
+    if(d.text) for(const [k,lab] of d.text){
+      h+=`<div class="prow"><div class="lab"><span>${lab}</span></div><input type="text" data-txt="${k}" value="${esc(b.params[k])}"></div>`;
+    }
+    if(d.signs){
+      h+=`<div class="prow"><div class="lab"><span>Anzahl Eingänge</span><select data-ins style="width:60px">${[2,3].map(n=>`<option ${b.ins===n?"selected":""}>${n}</option>`).join("")}</select></div></div>`;
+      for(let i=0;i<b.ins;i++) h+=`<div class="prow"><div class="lab"><span>Vorzeichen ${PORTNAME[portPos(b,"in",i).dir]}</span>
+        <select data-sign="${i}" style="width:56px"><option ${b.params["s"+i]==="+"?"selected":""}>+</option><option ${b.params["s"+i]==="−"?"selected":""}>−</option></select></div></div>`;
+    }
+    if(d.matrix){
+      h+=`<div class="prow"><div class="lab"><span>Beschriftung</span></div><input type="text" data-txt="name" value="${esc(b.params.name)}"></div>
+          <div class="prow"><div class="lab"><span>Eingänge</span><select data-mio="ins" style="width:56px">${[1,2,3].map(n=>`<option ${b.ins===n?"selected":""}>${n}</option>`).join("")}</select></div></div>
+          <div class="prow"><div class="lab"><span>Ausgänge</span><select data-mio="outs" style="width:56px">${[1,2,3].map(n=>`<option ${b.outs===n?"selected":""}>${n}</option>`).join("")}</select></div></div>`;
+      for(let j=0;j<b.ins;j++) h+=`<div class="prow"><div class="lab"><span>Name Eingang ${j+1}</span></div><input type="text" data-txt="li${j}" value="${esc(b.params["li"+j])}"></div>`;
+      for(let i=0;i<b.outs;i++) h+=`<div class="prow"><div class="lab"><span>Name Ausgang ${i+1}</span></div><input type="text" data-txt="lo${i}" value="${esc(b.params["lo"+i])}"></div>`;
+      h+=`</div><div class="sec"><h3>G(s) je Pfad — Koeffizienten absteigend</h3>`;
+      for(let i=0;i<b.outs;i++) for(let j=0;j<b.ins;j++){
+        h+=`<div class="prow"><div class="lab"><span>${esc(b.params["lo"+i])} / ${esc(b.params["li"+j])}</span></div>
+            <input type="text" data-txt="n${i}${j}" value="${esc(b.params["n"+i+j]||"0")}" placeholder="Zähler">
+            <input type="text" data-txt="d${i}${j}" value="${esc(b.params["d"+i+j]||"1")}" placeholder="Nenner" style="margin-top:3px"></div>`;
+      }
+    }
+    h+=`</div>`;
+  }
+  const ana=anaHTML(b);
+  if(ana) h+=`<div class="sec" id="anaSec">${ana}</div>`;
+  h+=`<div class="sec"><button class="btn ghost" data-del style="width:100%">Block löschen</button></div>`;
+  el.innerHTML=h;
+
+  el.querySelectorAll("[data-num]").forEach(i=>i.addEventListener("input",e=>{ setP(b,e.target.dataset.num,parseFloat(e.target.value)); const r=el.querySelector(`[data-rng="${e.target.dataset.num}"]`); if(r)r.value=e.target.value; }));
+  el.querySelectorAll("[data-rng]").forEach(i=>i.addEventListener("input",e=>{ setP(b,e.target.dataset.rng,parseFloat(e.target.value)); const r=el.querySelector(`[data-num="${e.target.dataset.rng}"]`); if(r)r.value=e.target.value; }));
+  el.querySelectorAll("[data-txt]").forEach(i=>i.addEventListener("input",e=>setP(b,e.target.dataset.txt,e.target.value)));
+  el.querySelectorAll("[data-sign]").forEach(i=>i.addEventListener("change",e=>setP(b,"s"+e.target.dataset.sign,e.target.value)));
+  const ins=el.querySelector("[data-ins]"); if(ins) ins.addEventListener("change",e=>{ b.ins=parseInt(e.target.value); model.edges=model.edges.filter(x=>!(x.to===b.id&&(x.port||0)>=b.ins)); render(); inspector(); run(); commit(); });
+  el.querySelectorAll("[data-mio]").forEach(i=>i.addEventListener("change",e=>{
+    const w=e.target.dataset.mio, n=parseInt(e.target.value); b[w]=n;
+    if(w==="ins") model.edges=model.edges.filter(x=>!(x.to===b.id&&(x.port||0)>=n));
+    else model.edges=model.edges.filter(x=>!(x.from===b.id&&(x.fromPort||0)>=n));
+    render(); inspector(); run(); commit(); }));
+  const del=el.querySelector("[data-del]"); if(del) del.addEventListener("click",()=>{ delBlock(b.id); render(); inspector(); run(); commit(); });
+  const flp=el.querySelector("[data-flip]"); if(flp) flp.addEventListener("click",()=>flipBlock(b));
+  if(d.tf) try{ drawBode(d.tf(b.params)); }catch(e){}
+}
+function cstr(p){ if(p.im===0) return fmt(p.re); return `${fmt(p.re)} ${p.im<0?"−":"+"} ${fmt(Math.abs(p.im))}j`; }
+let inspTimer=null;
+function setP(b,k,v){ if(typeof v==="number"&&!isFinite(v)) return; b.params[k]=v; render();
+  paramPend=true; clearTimeout(paramCommitT); paramCommitT=setTimeout(commit,900);
+  clearTimeout(inspTimer); inspTimer=setTimeout(()=>{ run(); refreshAnalysis(b); },80); }
+function refreshAnalysis(b){
+  const sec=$("#anaSec"); if(!sec||!model.blocks.includes(b)) return;
+  sec.innerHTML=anaHTML(b);
+  const d=DEFS[b.type]; if(d.tf) try{ drawBode(d.tf(b.params)); }catch(e){}
+}
+/* ---------- Bode-Miniplot ---------- */
+function drawBode(tf){
+  const cv=$("#bode"); if(!cv) return;
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth||240, H=118;
+  cv.width=W*dpr; cv.height=H*dpr; const g=cv.getContext("2d"); g.scale(dpr,dpr); g.clearRect(0,0,W,H);
+  const num=strip(tf.num), den=strip(tf.den);
+  const N=160, w=[], mag=[], ph=[];
+  for(let i=0;i<N;i++){ const ww=Math.pow(10,-2+4*i/(N-1)); const s={re:0,im:ww};
+    const v=cdiv(polyval(num,s),polyval(den,s));
+    w.push(ww); mag.push(20*Math.log10(Math.max(cabs(v),1e-9)));
+    let a=Math.atan2(v.im,v.re)*180/Math.PI; ph.push(a); }
+  for(let i=1;i<N;i++){ while(ph[i]-ph[i-1]>180) ph[i]-=360; while(ph[i]-ph[i-1]<-180) ph[i]+=360; }
+  const pad={l:30,r:6,t:6,b:14}, hh=(H-pad.t-pad.b-6)/2;
+  const areas=[{y0:pad.t,vals:mag,unit:"dB"},{y0:pad.t+hh+6,vals:ph,unit:"°"}];
+  g.font="9px 'IBM Plex Mono', monospace"; g.textBaseline="middle";
+  areas.forEach((A,ai)=>{
+    let lo=Math.min(...A.vals), hi=Math.max(...A.vals); if(hi-lo<1){hi+=1;lo-=1;}
+    const px=i=>pad.l+(W-pad.l-pad.r)*i/(N-1), py=v=>A.y0+hh-(v-lo)/(hi-lo)*hh;
+    g.strokeStyle="#E1E6DE"; g.lineWidth=1;
+    for(let d=-2;d<=2;d++){ const x=pad.l+(W-pad.l-pad.r)*(d+2)/4; g.beginPath(); g.moveTo(x,A.y0); g.lineTo(x,A.y0+hh); g.stroke(); }
+    g.strokeStyle="#C3CCC5"; g.strokeRect(pad.l,A.y0,W-pad.l-pad.r,hh);
+    g.fillStyle="#8C9AA1"; g.textAlign="right";
+    g.fillText(Math.round(hi)+"",pad.l-3,A.y0+4); g.fillText(Math.round(lo)+"",pad.l-3,A.y0+hh-4);
+    g.fillText(A.unit,pad.l-3,A.y0+hh/2);
+    g.strokeStyle=ai?"#A8412A":"#0F6469"; g.lineWidth=1.5; g.beginPath();
+    for(let i=0;i<N;i++){ const x=px(i),y=py(A.vals[i]); i?g.lineTo(x,y):g.moveTo(x,y); } g.stroke();
+  });
+  g.fillStyle="#8C9AA1"; g.textAlign="center";
+  ["10⁻²","10⁻¹","1","10","10²"].forEach((t,i)=>g.fillText(t,pad.l+(W-pad.l-pad.r)*i/4,H-6));
+  g.textAlign="left"; g.fillText("ω [1/s]",pad.l+2,H-6);
+}
+
+/* =========================================================================
+   4. PLOT
+   ========================================================================= */
+const PAL=["--t1","--t2","--t3","--t4","--t5"];
+function cssv(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+let last=null;
+function drawPlot(res){
+  const cv=$("#plot"), dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth, H=cv.clientHeight;
+  cv.width=W*dpr; cv.height=H*dpr; const g=cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,W,H);
+  const pad={l:52,r:16,t:12,b:26};
+  const t0=0,t1=res.ts[res.ts.length-1]||1;
+  let lo=0,hi=0,any=false;
+  res.data.forEach(d=>d.forEach(v=>{ if(isFinite(v)){ lo=Math.min(lo,v); hi=Math.max(hi,v); any=true; } }));
+  if(!any||hi-lo<1e-9){ lo-=1; hi+=1; }
+  const m=(hi-lo)*0.1; lo-=m; hi+=m;
+  const px=t=>pad.l+(W-pad.l-pad.r)*(t-t0)/(t1-t0||1), py=v=>pad.t+(H-pad.t-pad.b)*(1-(v-lo)/(hi-lo));
+  // Gitter
+  g.font="10px 'IBM Plex Mono', monospace"; g.textBaseline="middle";
+  const ny=niceTicks(lo,hi,5), nx=niceTicks(t0,t1,6);
+  g.strokeStyle=cssv("--rule2"); g.lineWidth=1; g.fillStyle=cssv("--ink3");
+  g.textAlign="right";
+  ny.forEach(v=>{ const y=py(v); g.beginPath(); g.moveTo(pad.l,y); g.lineTo(W-pad.r,y); g.stroke(); g.fillText(fmtTick(v),pad.l-6,y); });
+  g.textAlign="center";
+  nx.forEach(v=>{ const x=px(v); g.beginPath(); g.moveTo(x,pad.t); g.lineTo(x,H-pad.b); g.stroke(); g.fillText(fmtTick(v),x,H-pad.b+11); });
+  if(lo<0&&hi>0){ g.strokeStyle=cssv("--rule"); g.lineWidth=1.2; const y=py(0); g.beginPath(); g.moveTo(pad.l,y); g.lineTo(W-pad.r,y); g.stroke(); }
+  g.strokeStyle=cssv("--ink"); g.lineWidth=1.2; g.strokeRect(pad.l,pad.t,W-pad.l-pad.r,H-pad.t-pad.b);
+  g.fillStyle=cssv("--ink3"); g.textAlign="left"; g.fillText("t [s]",W-pad.r-26,H-pad.b+11);
+  res.data.forEach((d,i)=>{
+    g.strokeStyle=cssv(PAL[i%PAL.length]); g.lineWidth=1.8; g.beginPath();
+    let started=false;
+    for(let k=0;k<d.length;k++){ const v=d[k]; if(!isFinite(v)) continue; const x=px(res.ts[k]),y=py(v);
+      if(!started){ g.moveTo(x,y); started=true; } else g.lineTo(x,y); }
+    g.stroke();
+  });
+  // Legende
+  $("#legend").innerHTML=res.names.map((n,i)=>{
+    const d=res.data[i], v=d.length?d[d.length-1]:NaN;
+    return `<span class="lg"><i style="background:var(${PAL[i%PAL.length]})"></i>${esc(n)} <span style="color:var(--ink3)">→ ${isFinite(v)?fmt(v):"—"}</span></span>`;
+  }).join("");
+}
+function niceTicks(a,b,n){ const span=b-a||1, step=Math.pow(10,Math.floor(Math.log10(span/n)));
+  const err=span/n/step; const mult=err>=5?10:err>=2?5:err>=1?2:1; const s=step*mult;
+  const out=[]; for(let v=Math.ceil(a/s)*s; v<=b+1e-9; v+=s) out.push(Math.abs(v)<1e-12?0:v); return out; }
+function fmtTick(v){ const a=Math.abs(v); if(a>=1e4||(a<1e-3&&a>0)) return v.toExponential(0); return String(Math.round(v*1e3)/1e3); }
+
+/* =========================================================================
+   4b. S-EBENE + WURZELORTSKURVE
+   ========================================================================= */
+let plotMode="time";
+function setMode(m){ plotMode=m;
+  document.querySelectorAll(".tabbtn").forEach(b=>b.classList.toggle("on",b.dataset.tab===m));
+  $("#plot").style.display=m==="time"?"block":"none";
+  $("#splane").style.display=m==="splane"?"block":"none";
+  $("#legend").style.display=m==="time"?"flex":"none";
+  $("#wokCtl").style.display=m==="splane"?"inline-flex":"none";
+  $("#sinfo").style.display=m==="splane"?"inline":"none";
+  if(m==="splane"){ fillWok(); drawSPlane(); } else if(last) drawPlot(last);
+}
+document.querySelectorAll(".tabbtn").forEach(b=>b.addEventListener("click",()=>setMode(b.dataset.tab)));
+function gainLabel(b){
+  /* Name eines Zielblocks hinter der Verstärkung als Kontext */
+  const out=model.edges.find(e=>e.from===b.id);
+  const tgt=out&&model.blocks.find(x=>x.id===out.to);
+  const ctx=tgt?((DEFS[tgt.type].matrix?tgt.params.name:DEFS[tgt.type].cap)||DEFS[tgt.type].name):"";
+  return `k = ${fmt(b.params.k)}${ctx?"  →  "+ctx:""}`;
+}
+function fillWok(){
+  const sl=$("#wokSel"), cur=sl.value;
+  sl.innerHTML=`<option value="">— keine —</option>`+
+    model.blocks.filter(b=>b.type==="gain").map(b=>`<option value="${b.id}">${esc(gainLabel(b))}</option>`).join("");
+  if([...sl.options].some(o=>o.value===cur)) sl.value=cur;
+}
+$("#wokSel").addEventListener("change",drawSPlane);
+function domInfo(poles){
+  if(!poles.length) return "";
+  let d=poles[0]; for(const p of poles) if(p.re>d.re||(p.re===d.re&&Math.abs(p.im)>Math.abs(d.im))) d=p;
+  const w0=Math.hypot(d.re,d.im);
+  let t=`dominant: ${cstr(d)}`;
+  if(Math.abs(d.im)>1e-9&&w0>1e-9) t+=`   ω₀=${fmt(w0)}  D=${fmt(-d.re/w0)}  T=${fmt(2*Math.PI/Math.abs(d.im))} s`;
+  else if(Math.abs(d.re)>1e-9) t+=`   T=${fmt(1/Math.abs(d.re))} s`;
+  const stab=poles.every(p=>p.re<-1e-9);
+  return t+`   ·  ${stab?"stabil":poles.some(p=>p.re>1e-9)?"INSTABIL":"grenzstabil"}`;
+}
+function drawSPlane(){
+  const cv=$("#splane"); if(cv.style.display==="none") return;
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
+  cv.width=W*dpr; cv.height=H*dpr; const g=cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,W,H);
+  let res, sweep=null, k0=null;
+  try{ res=sysPoles(model); }catch(err){ $("#sinfo").textContent=err.message; return; }
+  const gid=+$("#wokSel").value;
+  const gb=model.blocks.find(b=>b.id===gid&&b.type==="gain");
+  if(gb){ k0=gb.params.k;
+    const kmax=(Math.abs(k0)>1e-9?2*k0:2), NS=61; sweep=[];
+    try{ for(let i=0;i<NS;i++){ gb.params.k=kmax*i/(NS-1); sweep.push({k:gb.params.k,poles:sysPoles(model).poles}); } }
+    catch(err){ sweep=null; }
+    finally{ gb.params.k=k0; }
+  }
+  /* Wertebereich */
+  let pts=res.poles.slice();
+  if(sweep) for(const st of sweep) pts=pts.concat(st.poles);
+  if(!pts.length){ $("#sinfo").textContent="keine Zustände im Modell"; return; }
+  let x0=0,x1=0,y1=0;
+  for(const p of pts){ x0=Math.min(x0,p.re); x1=Math.max(x1,p.re); y1=Math.max(y1,Math.abs(p.im)); }
+  const mx=(x1-x0)*0.15+0.4, my=y1*0.15+0.4;
+  x0-=mx; x1+=mx; let y0=-(y1+my); y1+=my;
+  const pad={l:46,r:14,t:10,b:22};
+  const px=x=>pad.l+(W-pad.l-pad.r)*(x-x0)/(x1-x0), py=y=>pad.t+(H-pad.t-pad.b)*(1-(y-y0)/(y1-y0));
+  g.font="10px 'IBM Plex Mono', monospace"; g.textBaseline="middle";
+  /* instabile Halbebene */
+  if(x1>0){ g.fillStyle="#9E3B2612"; g.fillRect(px(0),pad.t,W-pad.r-px(0),H-pad.t-pad.b); }
+  /* Gitter */
+  const nx=niceTicks(x0,x1,7), ny=niceTicks(y0,y1,5);
+  g.strokeStyle=cssv("--rule2"); g.lineWidth=1; g.fillStyle=cssv("--ink3");
+  g.textAlign="center";
+  nx.forEach(v=>{ const x=px(v); g.beginPath(); g.moveTo(x,pad.t); g.lineTo(x,H-pad.b); g.stroke(); g.fillText(fmtTick(v),x,H-pad.b+10); });
+  g.textAlign="right";
+  ny.forEach(v=>{ const y=py(v); g.beginPath(); g.moveTo(pad.l,y); g.lineTo(W-pad.r,y); g.stroke(); g.fillText(fmtTick(v),pad.l-5,y); });
+  /* Dämpfungsstrahlen cos θ = D und ω₀-Kreise */
+  g.save(); g.beginPath(); g.rect(pad.l,pad.t,W-pad.l-pad.r,H-pad.t-pad.b); g.clip();
+  g.strokeStyle=cssv("--rule"); g.setLineDash([4,4]);
+  for(const D of [0.2,0.5,0.8]){
+    const th=Math.acos(D), R=Math.max(x1-x0,y1-y0)*3;
+    for(const sg of [1,-1]){
+      g.beginPath(); g.moveTo(px(0),py(0));
+      g.lineTo(px(-R*D),py(sg*R*Math.sin(th)));
+      g.stroke();
+    }
+    const rl=Math.min(-x0,y1/Math.tan(th))*0.92;
+    if(rl>0){ g.fillStyle=cssv("--ink3"); g.textAlign="left";
+      g.fillText("D="+D, px(-rl*D)+2, py(rl*Math.sin(th))-6); }
+  }
+  /* ω₀-Kreise */
+  const wt=niceTicks(0,Math.max(-x0,y1),4).filter(v=>v>0);
+  for(const w of wt){ g.beginPath();
+    for(let i=0;i<=60;i++){ const ph=Math.PI/2+i*Math.PI/60;
+      const x=px(w*Math.cos(ph)), y=py(w*Math.sin(ph)); i?g.lineTo(x,y):g.moveTo(x,y); }
+    g.stroke();
+    g.fillStyle=cssv("--ink3"); g.textAlign="left"; g.fillText("ω₀="+fmtTick(w),px(-w)+3,py(0)-8);
+  }
+  g.setLineDash([]);
+  /* Achsen */
+  g.strokeStyle=cssv("--ink"); g.lineWidth=1.2;
+  g.beginPath(); g.moveTo(pad.l,py(0)); g.lineTo(W-pad.r,py(0)); g.stroke();
+  if(x0<0&&x1>0){ g.beginPath(); g.moveTo(px(0),pad.t); g.lineTo(px(0),H-pad.b); g.stroke(); }
+  g.fillStyle=cssv("--ink2"); g.textAlign="left";
+  g.fillText("Re",W-pad.r-18,py(0)-8); g.fillText("Im",px(0)+5,pad.t+8);
+  /* Wurzelortskurve: Äste über Nächste-Nachbar-Zuordnung verbinden */
+  if(sweep&&sweep.length){
+    const n=sweep[0].poles.length;
+    let order=sweep[0].poles.map((_,i)=>i);
+    const branches=order.map(i=>[sweep[0].poles[i]]);
+    for(let st=1;st<sweep.length;st++){
+      const prev=branches.map(br=>br[br.length-1]);
+      const used=new Array(n).fill(false), pick=[];
+      for(let i=0;i<n;i++){ let bi=-1,bd=1e18;
+        for(let j=0;j<n;j++){ if(used[j]) continue;
+          const d=Math.hypot(prev[i].re-sweep[st].poles[j].re, prev[i].im-sweep[st].poles[j].im);
+          if(d<bd){bd=d;bi=j;} }
+        used[bi]=true; pick.push(bi); }
+      for(let i=0;i<n;i++) branches[i].push(sweep[st].poles[pick[i]]);
+    }
+    g.strokeStyle=cssv("--dial"); g.lineWidth=1.6;
+    for(const br of branches){ g.beginPath();
+      br.forEach((pp,i)=>{ const x=px(pp.re),y=py(pp.im); i?g.lineTo(x,y):g.moveTo(x,y); });
+      g.stroke(); }
+    /* Start k=0: Quadrate */
+    g.fillStyle=cssv("--dial");
+    for(const pp of sweep[0].poles) g.fillRect(px(pp.re)-3,py(pp.im)-3,6,6);
+    /* Pfeilspitze am Ende */
+    g.strokeStyle=cssv("--dial");
+    for(const br of branches){ const e2=br[br.length-1], e1=br[Math.max(0,br.length-4)];
+      const dx=px(e2.re)-px(e1.re), dy=py(e2.im)-py(e1.im), L=Math.hypot(dx,dy)||1;
+      const ux=dx/L, uy=dy/L;
+      g.beginPath();
+      g.moveTo(px(e2.re),py(e2.im));
+      g.lineTo(px(e2.re)-7*ux+3.5*uy, py(e2.im)-7*uy-3.5*ux);
+      g.moveTo(px(e2.re),py(e2.im));
+      g.lineTo(px(e2.re)-7*ux-3.5*uy, py(e2.im)-7*uy+3.5*ux);
+      g.stroke(); }
+  }
+  g.restore();
+  /* aktuelle Pole als × */
+  g.strokeStyle=cssv("--warn"); g.lineWidth=2;
+  for(const pp of res.poles){ const x=px(pp.re), y=py(pp.im);
+    g.beginPath(); g.moveTo(x-5,y-5); g.lineTo(x+5,y+5); g.moveTo(x-5,y+5); g.lineTo(x+5,y-5); g.stroke(); }
+  let info=domInfo(res.poles);
+  if(res.hasSat) info+="   ·  Begrenzung ≈ 1 linearisiert";
+  if(gb) info+=`   ·  WOK: k = 0 … ${fmt(Math.abs(k0)>1e-9?2*k0:2)}, × bei k = ${fmt(k0)}`;
+  $("#sinfo").textContent=info;
+}
+
+function run(){
+  const T=Math.max(0.1,parseFloat($("#tend").value)||20);
+  const st=$("#status");
+  try{
+    const res=simulate(model,T); last=res;
+    if(!res.data.length){ st.className="ok"; st.textContent="keine Anzeige im Modell"; $("#legend").innerHTML=""; drawPlot({ts:[0,T],data:[],names:[]}); return; }
+    drawPlot(res);
+    if(res.warn.length){ st.className="bad"; st.textContent=res.warn[0]; }
+    else if(res.unstable){ st.className="bad"; st.textContent="instabil — Signale laufen weg"; }
+    else { st.className="ok"; st.textContent="ok · RK4 · "+res.ts.length+" Punkte"; }
+  }catch(err){ st.className="bad"; st.textContent=err.message; }
+  if(plotMode==="splane"){ fillWok(); drawSPlane(); }
+}
+buildPalette(); inspector();
+
+$("#palette").addEventListener("click",e=>{
+  const t=e.target.closest("[data-add]"); if(!t) return;
+  if(palDrag&&palDrag.consumed){ palDrag=null; return; }   /* war ein Drag, kein Klick */
+  palDrag=null;
+  const type=t.dataset.add;
+  const cx=(stage.clientWidth/2-view.x)/view.k-56, cy=(stage.clientHeight/2-view.y)/view.k-29;
+  const b=addBlock(type,cx+((model.blocks.length*17)%80),cy+((model.blocks.length*23)%80));
+  sel=b.id; render(); inspector(); run(); commit();
+});
+$("#palette").addEventListener("mousedown",e=>{
+  const t=e.target.closest("[data-add]"); if(!t) return;
+  palDrag={type:t.dataset.add,sx:e.clientX,sy:e.clientY,consumed:false};
+});
+$("#btnRun").addEventListener("click",run);
+$("#tend").addEventListener("change",run);
+$("#btnClear").addEventListener("click",()=>{ flushParams(); model={blocks:[],edges:[],next:1}; sel=null; selEdge=null; $("#preset").value=""; render(); inspector(); run(); commit(); });
+$("#btnUndo").addEventListener("click",undo);
+$("#btnRedo").addEventListener("click",redo);
+$("#btnHelp").addEventListener("click",()=>{ $("#mHelp").classList.add("on"); });
+$("#btnIO").addEventListener("click",()=>{ $("#io").value=JSON.stringify(model,(k,v)=>k==="_r"?undefined:v); $("#mIO").classList.add("on"); });
+$("#ioLoad").addEventListener("click",()=>{ try{ const m=JSON.parse($("#io").value); if(!m.blocks) throw new Error("x");
+  model=normalize(m); sel=null; selEdge=null; $("#mIO").classList.remove("on"); render(); inspector(); run(); commit(); }catch(e){ alert("Text konnte nicht gelesen werden."); } });
+document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>b.closest(".modal").classList.remove("on")));
+document.querySelectorAll(".modal").forEach(m=>m.addEventListener("click",e=>{ if(e.target===m) m.classList.remove("on"); }));
+
+/* Hilfetabelle */
+$("#helpTable").innerHTML=`<tr><th>Block</th><th>G(s)</th><th>Rolle</th></tr>`+Object.values(DEFS).map(d=>{
+  let g="—"; try{ if(d.tf){ const {num,den}=d.tf(d.params); g=`<code>${poly(strip(num))}</code> / <code>${poly(strip(den))}</code>`; } }catch(e){}
+  if(d.src) g="<code>Quelle</code>"; if(d.key==="sum") g="<code>Σ ±u_i</code>"; if(d.nonlin) g="<code>nichtlinear</code>";
+  if(d.matrix) g="<code>y_i = Σ_j G_ij(s)·u_j</code>"; if(d.shape==="node") g="<code>y = u</code>";
+  return `<tr><td style="white-space:nowrap"><b>${d.name}</b></td><td>${g}</td><td class="hint">${d.help}</td></tr>`; }).join("");
+
+/* ---------- Verbinden, Verzweigen, Einrasten ---------- */
+function makeEdge(src,dst){
+  if(src.id===dst.id) return false;
+  model.edges=model.edges.filter(e=>!(e.to===dst.id&&(e.port||0)===dst.port));
+  model.edges.push({from:src.id,fromPort:src.port,to:dst.id,port:dst.port});
+  return true;
+}
+/* Zwei angeklickte Anschlüsse verbinden — Richtung egal, Verzweigung ist beides */
+function joinPorts(a,b){
+  const ok=(x,y)=>x.kind===y[0]&&(y.length<2||true);
+  if(a.id===b.id) return false;
+  if(a.kind==="out"&&(b.kind==="in"||b.kind==="node")) return makeEdge(a,b);
+  if((a.kind==="in"||a.kind==="node")&&b.kind==="out") return makeEdge(b,a);
+  if(a.kind==="node"&&b.kind==="in") return makeEdge(a,b);
+  if(a.kind==="in"&&b.kind==="node") return makeEdge(b,a);
+  if(a.kind==="node"&&b.kind==="node") return makeEdge(a,b);
+  return false;
+}
+/* Leitung an Punkt p auftrennen -> neue Verzweigung, gibt deren Id zurück */
+function splitEdge(idx,p){
+  const e=model.edges[idx];
+  const nb=addBlock("node",p.x-6,p.y-6);
+  const oldTo=e.to, oldPort=e.port||0;
+  e.to=nb.id; e.port=0; delete e.m; delete e.fam;
+  model.edges.push({from:nb.id,fromPort:0,to:oldTo,port:oldPort});
+  return nb.id;
+}
+/* Block in eine Leitung einfügen */
+function insertInto(idx,b,seg){
+  const e=model.edges[idx];
+  const oldTo=e.to, oldPort=e.port||0;
+  e.to=b.id; e.port=0; delete e.m; delete e.fam;
+  model.edges.push({from:b.id,fromPort:0,to:oldTo,port:oldPort});
+  const s=SIZE(b), horiz=Math.abs(seg.a.y-seg.b.y)<1;
+  if(horiz){
+    b.flip = seg.b.x < seg.a.x;          /* Signal läuft nach links → spiegeln */
+    b.y=Math.round(seg.a.y-portPos(b,"in",0).y+b.y);
+    b.x=Math.round((seg.a.x+seg.b.x)/2-s.w/2);
+  } else b.x=Math.round(seg.a.x-s.w/2);
+}
+const freeSlot=b=>(b.ins||0)>=1&&(b.outs||0)>=1&&!model.edges.some(e=>(e.to===b.id&&(e.port||0)===0)||(e.from===b.id&&(e.fromPort||0)===0));
+
+let drag=null,pan=null,wdrag=null,palDrag=null;
+const worldPos=ev=>{ const r=stage.getBoundingClientRect(); return {x:(ev.clientX-r.left-view.x)/view.k, y:(ev.clientY-r.top-view.y)/view.k}; };
+
+/* ---------- Undo / Redo ---------- */
+const snap=()=>JSON.stringify(model,(k,v)=>k==="_r"?undefined:v);
+let undoStack=[], redoStack=[], histPrev=null, paramPend=false;
+function commit(){ if(histPrev===null){ histPrev=snap(); return; }
+  const now=snap(); if(now===histPrev) return;
+  undoStack.push(histPrev); if(undoStack.length>100) undoStack.shift();
+  redoStack.length=0; histPrev=now; paramPend=false; }
+function flushParams(){ if(paramPend){ clearTimeout(paramCommitT); commit(); } }
+let paramCommitT=null;
+function loadState(st){ model=normalize(JSON.parse(st)); sel=null; selEdge=null; arm=null;
+  render(); inspector(); run(); }
+function undo(){ flushParams(); if(!undoStack.length) return;
+  redoStack.push(histPrev); histPrev=undoStack.pop(); loadState(histPrev); }
+function redo(){ if(!redoStack.length) return;
+  undoStack.push(histPrev); histPrev=redoStack.pop(); loadState(histPrev); }
+
+stage.addEventListener("mousedown",e=>{
+  const port=e.target.closest(".port");
+  const isNode=port&&port.dataset.kind==="node";
+  if(port&&!(isNode&&!arm)){
+    e.preventDefault();
+    const t={id:+port.dataset.id,port:+port.dataset.port,kind:port.dataset.kind};
+    if(!arm){ arm=t; render(); }
+    else if(joinPorts(arm,t)){ arm=null; render(); run(); commit(); }
+    else { arm=t; render(); }
+    return;
+  }
+  const hit=e.target.closest("[data-edge]");
+  if(hit&&arm&&(arm.kind==="in"||arm.kind==="node")){
+    e.preventDefault();
+    const idx=+hit.dataset.edge, w=worldPos(e);
+    let best=null; for(const sg of model.edges[idx]._r.segs){ const r=projSeg(w,sg); if(!best||r.d<best.d) best=r; }
+    const nid=splitEdge(idx,best.q);
+    joinPorts({id:nid,port:0,kind:"node"},arm);
+    arm=null; sel=null; selEdge=null; render(); inspector(); run(); commit(); return;
+  }
+  const blk=e.target.closest(".blk");
+  if(blk){ const id=+blk.dataset.id, b=model.blocks.find(x=>x.id===id);
+    sel=id; selEdge=null; arm=null;
+    drag={b,ox:e.clientX/view.k-b.x,oy:e.clientY/view.k-b.y,moved:false};
+    render(); inspector(); return; }
+  if(hit){ e.preventDefault();
+    const idx=+hit.dataset.edge, ed=model.edges[idx];
+    selEdge=idx; sel=null; arm=null; render(); inspector();
+    if(ed&&ed._r) wdrag={e:ed,axis:ed._r.handle.axis,fam:ed._r.fam};
+    return; }
+  sel=null; selEdge=null; arm=null; render(); inspector();
+  pan={x:e.clientX-view.x,y:e.clientY-view.y}; stage.style.cursor="grabbing";
+});
+
+window.addEventListener("mousemove",e=>{
+  if(palDrag&&!palDrag.consumed&&Math.hypot(e.clientX-palDrag.sx,e.clientY-palDrag.sy)>5){
+    palDrag.consumed=true;
+    const w=worldPos(e), d=DEFS[palDrag.type], b=addBlock(palDrag.type,0,0);
+    const sz=SIZE(b); b.x=Math.round(w.x-sz.w/2); b.y=Math.round(w.y-sz.h/2);
+    sel=b.id; selEdge=null; arm=null;
+    drag={b,ox:e.clientX/view.k-b.x,oy:e.clientY/view.k-b.y,moved:true,fromPal:true};
+    render(); inspector();
+  }
+  if(wdrag){
+    const w=worldPos(e); let v=wdrag.axis==="x"?w.x:w.y;
+    snapGuide=null;
+    for(const ed of model.edges){ if(ed===wdrag.e||!ed._r) continue;
+      if(ed._r.handle.axis!==wdrag.axis) continue;
+      if(Math.abs(ed._r.m-v)<7/view.k){ v=ed._r.m; snapGuide={axis:wdrag.axis==="x"?"x":"y",v}; break; } }
+    wdrag.e.fam=wdrag.fam; wdrag.e.m=snapGuide?v:Math.round(v/2)*2; render(); return;
+  }
+  if(drag){
+    drag.moved=true;
+    drag.b.x=Math.round((e.clientX/view.k-drag.ox)/4)*4;
+    drag.b.y=Math.round((e.clientY/view.k-drag.oy)/4)*4;
+    hlEdge=null; snapGuide=null;
+    if(freeSlot(drag.b)&&DEFS[drag.b.type].shape!=="node"){
+      const s=SIZE(drag.b), c={x:drag.b.x+s.w/2,y:drag.b.y+s.h/2};
+      const n=nearestEdge(c,Math.max(26,s.h/2+8),drag.b.id);
+      if(n){ hlEdge=n.i; drag.cand=n; } else drag.cand=null;
+    } else drag.cand=null;
+    /* Ausrichtung an anderen Blöcken: Ports auf gleicher Höhe, Mitten auf gleicher x */
+    if(!drag.cand){
+      const b=drag.b, sz=SIZE(b), th=6/view.k;
+      const refY=(b.outs?portPos(b,"out",0):portPos(b,"in",0)).y;
+      const cx=b.x+sz.w/2;
+      let done=false;
+      for(const o of model.blocks){ if(o===b) continue;
+        for(let i=0;i<(o.outs||0)&&!done;i++){ const py=portPos(o,"out",i).y;
+          if(Math.abs(py-refY)<th){ b.y+=py-refY; snapGuide={axis:"y",v:py}; done=true; } }
+        for(let i=0;i<(o.ins||0)&&!done;i++){ const py=portPos(o,"in",i).y;
+          if(Math.abs(py-refY)<th){ b.y+=py-refY; snapGuide={axis:"y",v:py}; done=true; } }
+        if(done) break;
+      }
+      if(!done) for(const o of model.blocks){ if(o===b) continue;
+        const ocx=o.x+SIZE(o).w/2;
+        if(Math.abs(ocx-cx)<th){ b.x+=ocx-cx; snapGuide={axis:"x",v:ocx}; break; } }
+    }
+    render(); return;
+  }
+  if(pan){ view.x=e.clientX-pan.x; view.y=e.clientY-pan.y; world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.k})`; return; }
+  if(arm){ const b=model.blocks.find(x=>x.id===arm.id); if(!b) return;
+    const a=portPos(b,arm.kind==="out"?"out":"in",arm.port);
+    drawWires({a,b:worldPos(e)}); }
+});
+window.addEventListener("mouseup",e=>{
+  if(drag){
+    let changed=drag.moved;
+    if(drag.fromPal){
+      const r=stage.getBoundingClientRect();
+      const inside=e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;
+      if(!inside){ delBlock(drag.b.id); changed=false; sel=null; inspector(); }
+    }
+    if(drag&&drag.cand&&drag.moved&&model.blocks.includes(drag.b)) insertInto(drag.cand.i,drag.b,drag.cand.seg);
+    else if(!drag.moved&&DEFS[drag.b.type]&&DEFS[drag.b.type].shape==="node") arm={id:drag.b.id,port:0,kind:"node"};
+    drag=null; hlEdge=null; snapGuide=null; render(); run();
+    if(changed) commit();
+  }
+  if(wdrag){ wdrag=null; snapGuide=null; render(); commit(); }
+  if(pan){ pan=null; stage.style.cursor="default"; }
+});
+stage.addEventListener("wheel",e=>{ e.preventDefault();
+  const r=stage.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  const k2=Math.min(2,Math.max(.45,view.k*(e.deltaY<0?1.1:1/1.1)));
+  view.x=mx-(mx-view.x)*k2/view.k; view.y=my-(my-view.y)*k2/view.k; view.k=k2;
+  world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.k})`; },{passive:false});
+window.addEventListener("keydown",e=>{
+  const inField=document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  if((e.ctrlKey||e.metaKey)&&(e.key==="z"||e.key==="Z")&&!inField){ e.preventDefault(); e.shiftKey?redo():undo(); return; }
+  if((e.ctrlKey||e.metaKey)&&(e.key==="y"||e.key==="Y")&&!inField){ e.preventDefault(); redo(); return; }
+  if(inField){ if(e.key==="Escape") document.activeElement.blur(); return; }
+  if(e.key==="Escape"){ arm=null; render(); }
+  if((e.key==="f"||e.key==="F")&&sel!=null){ const b=model.blocks.find(x=>x.id===sel); if(b) flipBlock(b); }
+  if(e.key==="Delete"||e.key==="Backspace"){
+    if(sel!=null){ delBlock(sel); render(); inspector(); run(); commit(); }
+    else if(selEdge!=null){ model.edges.splice(selEdge,1); selEdge=null; render(); inspector(); run(); commit(); }
+  }
+});
+/* Höhe des Diagramms */
+const setPH=h=>{ const H=Math.max(120,Math.min(window.innerHeight-190,h));
+  document.documentElement.style.setProperty("--ph",H+"px");
+  if(plotMode==="splane") drawSPlane(); else if(last) drawPlot(last); };
+let rz=null;
+$("#resizer").addEventListener("mousedown",e=>{ e.preventDefault(); rz=true; document.body.style.cursor="ns-resize"; });
+$("#resizer").addEventListener("dblclick",()=>setPH(320));
+window.addEventListener("mousemove",e=>{ if(rz) setPH(window.innerHeight-e.clientY); });
+window.addEventListener("mouseup",()=>{ if(rz){ rz=null; document.body.style.cursor=""; } });
+$("#btnBig").addEventListener("click",()=>{
+  const cur=parseInt(getComputedStyle(document.documentElement).getPropertyValue("--ph"));
+  setPH(cur>window.innerHeight*0.55?320:window.innerHeight-230);
+});
+window.addEventListener("resize",()=>{ setPH(parseInt(getComputedStyle(document.documentElement).getPropertyValue("--ph"))||320); if(last) drawPlot(last); if(plotMode==="splane") drawSPlane();
+  const b=model.blocks.find(x=>x.id===sel); if(b&&DEFS[b.type].tf){ try{ drawBode(DEFS[b.type].tf(b.params)); }catch(e){} } });
+
+/* =========================================================================
+   6. BEISPIELE aus Vorlesung & Übungen
+   ========================================================================= */
+/* DO-328-Derivativa (Übung 3/3b):
+   Mq=-1,079/s  Zα=-0,9748/s  Mα=-5,7194/s²  Mη=-7,7048/s²  Xu=-0,0167/s  Zu=-0,0009/m
+   Phygoidnäherung (Ü5, Mu=0, Xα=0):
+     G_γη = (-1,3132·s - 0,010036)/(s² + 0,0167·s + 0,008829)
+     G_Vη = ( 13,215·s + 12,882 )/(s² + 0,0167·s + 0,008829)      */
+const DO={Mq:-1.079,Za:-0.9748,Ma:-5.7194,Mh:-7.7048,Xu:-0.0167,Zu:-0.0009};
+const PH={den:"1 0.0167 0.008829", ng:"-1.31319 -0.0100364", nv:"13.21539 12.88236"};
+const PRESETS={
+  /* Standardregelkreis: Übung 2.3 bzw. 3.4.1 */
+  loop(){ const m=blank();
+    const w =A(m,"step",40,150,{A:1}),
+          su=A(m,"sum",210,162,{s0:"+",s1:"−"},{ins:2}),
+          c =A(m,"pi",280,150,{K:2,Ti:1.5}),
+          g =A(m,"pt2",450,150,{K:1,w0:1.2,D:0.35}),
+          y =A(m,"scope",640,150,{name:"y (Regelgröße)"}),
+          se=A(m,"gain",450,300,{k:1},{flip:true}),
+          e =A(m,"scope",300,40,{name:"e (Regelabweichung)"});
+    C(m,w,0,su,0); C(m,su,0,c,0); C(m,c,0,g,0); C(m,g,0,y,0);
+    C(m,g,0,se,0); C(m,se,0,su,1); C(m,su,0,e,0);
+    return m; },
+
+  /* Grundtypen 3.3.2 */
+  basics(){ const m=blank();
+    const w=A(m,"step",40,190,{A:1});
+    const b1=A(m,"pt1",210,60,{K:1,T:1}), b2=A(m,"pt2",210,150,{K:1,w0:1,D:0.3}),
+          b3=A(m,"integ",210,240,{K:1}), b4=A(m,"hp",210,330,{T:1});
+    const y1=A(m,"scope",400,60,{name:"PT1"}), y2=A(m,"scope",400,150,{name:"PT2"}),
+          y3=A(m,"scope",400,240,{name:"I"}), y4=A(m,"scope",400,330,{name:"Hochpass"});
+    C(m,w,0,b1,0); C(m,w,0,b2,0); C(m,w,0,b3,0); C(m,w,0,b4,0);
+    C(m,b1,0,y1,0); C(m,b2,0,y2,0); C(m,b3,0,y3,0); C(m,b4,0,y4,0); return m; },
+
+  /* Übung 2.2d: Feder-Masse-Dämpfer als Signalflussplan.
+     ẍ = F/m − (d/m)ẋ − (c/m)x   →  zwei Integratoren, Rückführungen d/m und c/m.
+     m=1, d=0,6, c=4  → ω₀=2, D=0,15 */
+  msd(){ const m=blank();
+    const F =A(m,"step",20,150,{A:1}),
+          km=A(m,"gain",170,150,{k:1}),
+          su=A(m,"sum",340,162,{s0:"+",s1:"−",s2:"−"},{ins:3}),
+          i1=A(m,"integ",430,150,{K:1}),
+          nd=A(m,"node",580,161),
+          i2=A(m,"integ",640,150,{K:1}),
+          nx=A(m,"node",790,161),
+          sx=A(m,"scope",860,150,{name:"x  Auslenkung"}),
+          kd=A(m,"gain",430,40,{k:0.6},{flip:true}),
+          kc=A(m,"gain",560,300,{k:4},{flip:true}),
+          sv=A(m,"scope",640,40,{name:"ẋ  Geschwindigkeit"});
+    C(m,F,0,km,0); C(m,km,0,su,0); C(m,su,0,i1,0);
+    C(m,i1,0,nd,0); C(m,nd,0,i2,0); C(m,i2,0,nx,0); C(m,nx,0,sx,0);
+    C(m,nd,0,kd,0); C(m,kd,0,su,2);
+    C(m,nx,0,kc,0); C(m,kc,0,su,1);
+    C(m,nd,0,sv,0);
+    return m; },
+
+  /* Übung 3.3: Nickdämpfer DO 328, Dämpfung verdoppelt.
+     kηq = 0,365 → M*q = −3,891/s → Pole −2,43 ± 1,90j, q∞ = −0,790·ηc */
+  pitch(){ const m=blank();
+    const {Mq,Za,Ma,Mh}=DO, N=`1 ${-(Mq+Za)} ${Mq*Za-Ma}`;
+    const st=A(m,"step",30,150,{A:1}),
+          su=A(m,"sum",200,162,{s0:"+",s1:"+"},{ins:2}),
+          fz=A(m,"mtf",280,143,{name:"Flugzeug (AS)",li0:"η",lo0:"q",lo1:"α",
+              n00:`${Mh} ${-Mh*Za}`,d00:N, n10:`${Mh}`,d10:N},{ins:1,outs:2}),
+          nq=A(m,"node",446,161),
+          sq=A(m,"scope",560,138,{name:"q  Nickrate"}),
+          sa=A(m,"scope",560,240,{name:"α  Anstellwinkel"}),
+          k =A(m,"gain",300,320,{k:0.365},{flip:true});
+    C(m,st,0,su,0); C(m,su,0,fz,0);
+    C(m,fz,0,nq,0); C(m,nq,0,sq,0); C(m,fz,1,sa,0);
+    C(m,nq,0,k,0); C(m,k,0,su,1);
+    return m; },
+
+  /* Übung 3.5: q- UND α-Rückführung für ω₀ = 3/s, D = 0,8.
+     kηq = 0,356  kηα = −0,058 → Pole −2,40 ± 1,80j, q∞ = −0,835·ηc */
+  pitch2(){ const m=blank();
+    const {Mq,Za,Ma,Mh}=DO, N=`1 ${-(Mq+Za)} ${Mq*Za-Ma}`;
+    const st=A(m,"step",20,150,{A:1}),
+          su=A(m,"sum",190,162,{s0:"+",s1:"+",s2:"+"},{ins:3}),
+          fz=A(m,"mtf",280,143,{name:"Flugzeug (AS)",li0:"η",lo0:"q",lo1:"α",
+              n00:`${Mh} ${-Mh*Za}`,d00:N, n10:`${Mh}`,d10:N},{ins:1,outs:2}),
+          nq=A(m,"node",446,161), na=A(m,"node",470,201),
+          sq=A(m,"scope",580,138,{name:"q  Nickrate"}),
+          sa=A(m,"scope",580,240,{name:"α  Anstellwinkel"}),
+          kq=A(m,"gain",290,40,{k:0.356},{flip:true}),
+          ka=A(m,"gain",290,320,{k:-0.058},{flip:true});
+    C(m,st,0,su,0); C(m,su,0,fz,0);
+    C(m,fz,0,nq,0); C(m,nq,0,sq,0);
+    C(m,fz,1,na,0); C(m,na,0,sa,0);
+    C(m,nq,0,kq,0); C(m,kq,0,su,2);
+    C(m,na,0,ka,0); C(m,ka,0,su,1);
+    return m; },
+
+  /* Übung 4.1: Gierdämpfer — Struktur exakt wie im Lösungsblatt:
+     ζc ⊕→ Aktuator(1) → Flugzeug G_rζ → r,  Rückführung r → Kreisel(1) → Hochpass → kζr → ⊕ (+).
+     Flugzeugwerte sind Beispielwerte (die Übung rechnet symbolisch). */
+  yaw(){ const m=blank();
+    const Nz=-1.2,Yb=-0.15,Nr=-0.25,Nb=2.0;
+    const N=`1 ${-(Nr+Yb)} ${Nr*Yb+Nb}`;
+    const st=A(m,"step",20,150,{A:1}),
+          su=A(m,"sum",180,162,{s0:"+",s1:"+"},{ins:2}),
+          ak=A(m,"gain",250,150,{k:1}),
+          fz=A(m,"mtf",410,143,{name:"Flugzeug",li0:"ζ",lo0:"r",lo1:"β",
+              n00:`${Nz} ${-Nz*Yb}`,d00:N, n10:`${Nz}`,d10:N},{ins:1,outs:2}),
+          nr=A(m,"node",584,161),
+          sr=A(m,"scope",700,138,{name:"r  Gierrate"}),
+          sb=A(m,"scope",700,240,{name:"β  Schiebewinkel"}),
+          gy=A(m,"gain",560,330,{k:1},{flip:true}),
+          hp=A(m,"hp",400,330,{T:4},{flip:true}),
+          k =A(m,"gain",240,330,{k:0.6},{flip:true});
+    C(m,st,0,su,0); C(m,su,0,ak,0); C(m,ak,0,fz,0);
+    C(m,fz,0,nr,0); C(m,nr,0,sr,0); C(m,fz,1,sb,0);
+    C(m,nr,0,gy,0); C(m,gy,0,hp,0); C(m,hp,0,k,0); C(m,k,0,su,1);
+    return m; },
+
+  /* Übung 4.2: Lageregler. G_Θη ist in der Übung symbolisch (b2s²+b1s+b0)/(s⁴+…) —
+     hier mit Beispielkoeffizienten. P-Regler: Θ∞ = kb0/(a0+kb0) < 1. PI: Θ∞ = 1. */
+  theta(){ const m=blank();
+    const N="1 0.6 0.5", D="1 3.4 8.2 3.1 0.6";
+    const st=A(m,"step",20,150,{A:1}), s1=A(m,"sum",170,162,{s0:"+",s1:"−"},{ins:2}),
+          r =A(m,"gain",240,150,{k:1.5}),
+          g =A(m,"tf",400,150,{num:N,den:D,name:"Flugzeug  Θ/η"}),
+          sc=A(m,"scope",600,150,{name:"Θ  (P-Regler)"});
+    const s2=A(m,"step",20,340,{A:1}), s3=A(m,"sum",170,352,{s0:"+",s1:"−"},{ins:2}),
+          r2=A(m,"pi",240,340,{K:1.5,Ti:3}),
+          g2=A(m,"tf",400,340,{num:N,den:D,name:"Flugzeug  Θ/η"}),
+          sc2=A(m,"scope",600,340,{name:"Θ  (PI-Regler)"});
+    C(m,st,0,s1,0); C(m,s1,0,r,0); C(m,r,0,g,0); C(m,g,0,sc,0); C(m,g,0,s1,1);
+    C(m,s2,0,s3,0); C(m,s3,0,r2,0); C(m,r2,0,g2,0); C(m,g2,0,sc2,0); C(m,g2,0,s3,1);
+    return m; },
+
+  /* Übung 5.1–5.2: Höhenregelung mit ECHTER DO-328-Phygoidnäherung.
+     Flugzeug: η → γ und V. Ḣ = VK·γ mit VK=120 m/s.
+     G_γη(0) = −1,14 < 0 → kηγ negativ. Integrator in der Strecke ⇒ H∞ = HC. */
+  alt(){ const m=blank();
+    const hc=A(m,"step",20,150,{A:10}),
+          s1=A(m,"sum",150,162,{s0:"+",s1:"−"},{ins:2}),
+          kh=A(m,"gain",215,150,{k:0.005}),
+          s2=A(m,"sum",360,162,{s0:"+",s1:"−"},{ins:2}),
+          kg=A(m,"gain",425,150,{k:-2}),
+          fz=A(m,"mtf",580,143,{name:"Flugzeug (PH)",li0:"η",lo0:"γ",lo1:"V",
+              n00:PH.ng,d00:PH.den, n10:PH.nv,d10:PH.den},{ins:1,outs:2}),
+          ng=A(m,"node",734,161),
+          vk=A(m,"gain",790,138,{k:120}),
+          it=A(m,"integ",940,138,{K:1}),
+          nh=A(m,"node",1090,161),
+          hh=A(m,"scope",1140,138,{name:"H  [m]"}),
+          sg=A(m,"scope",830,40,{name:"γ  [rad]"}),
+          sv=A(m,"scope",830,250,{name:"V  [m/s]"});
+    C(m,hc,0,s1,0); C(m,s1,0,kh,0); C(m,kh,0,s2,0); C(m,s2,0,kg,0); C(m,kg,0,fz,0);
+    C(m,fz,0,ng,0); C(m,ng,0,vk,0); C(m,vk,0,it,0); C(m,it,0,nh,0); C(m,nh,0,hh,0);
+    C(m,ng,0,sg,0);
+    C(m,ng,0,s2,1,270,"H");
+    C(m,nh,0,s1,1,400,"H");
+    C(m,fz,1,sv,0);
+    return m; },
+
+  /* Übung 5.3–5.4: Aufwind ww springt bei t=60 s auf 2 m/s: Ḣ = VK·γ − ww.
+     Mit P-Höhenregler bleibt eine stationäre Ablage; PI-Regler (unten) beseitigt sie. */
+  altwind(){ const m=blank();
+    const mk=(y,pi,tag)=>{
+      const hc=A(m,"step",20,y+12,{A:10}),
+            s1=A(m,"sum",150,y+24,{s0:"+",s1:"−"},{ins:2}),
+            kh=pi? A(m,"pi",205,y+12,{K:0.005,Ti:40}) : A(m,"gain",215,y+12,{k:0.005}),
+            s2=A(m,"sum",360,y+24,{s0:"+",s1:"−"},{ins:2}),
+            kg=A(m,"gain",425,y+12,{k:-2}),
+            fz=A(m,"mtf",580,y+5,{name:"Flugzeug (PH)",li0:"η",lo0:"γ",lo1:"V",
+                n00:PH.ng,d00:PH.den, n10:PH.nv,d10:PH.den},{ins:1,outs:2}),
+            ng=A(m,"node",734,y+23),
+            vk=A(m,"gain",790,y,{k:120}),
+            sw=A(m,"sum",940,y+12,{s0:"+",s1:"−"},{ins:2}),
+            ww=A(m,"step",900,y-120,{A:2,t0:60}),
+            it=A(m,"integ",1010,y,{K:1}),
+            nh=A(m,"node",1160,y+23),
+            hh=A(m,"scope",1210,y,{name:"H "+tag});
+      C(m,hc,0,s1,0); C(m,s1,0,kh,0); C(m,kh,0,s2,0); C(m,s2,0,kg,0); C(m,kg,0,fz,0);
+      C(m,fz,0,ng,0); C(m,ng,0,vk,0); C(m,vk,0,sw,0); C(m,ww,0,sw,1); C(m,sw,0,it,0);
+      C(m,it,0,nh,0); C(m,nh,0,hh,0);
+      C(m,ng,0,s2,1,y+132,"H");
+      C(m,nh,0,s1,1,y+262,"H");
+    };
+    mk(150,false,"(P-Regler)"); mk(560,true,"(PI-Regler)");
+    return m; },
+
+  /* PID selbst gebaut: K(1 + 1/(T_i·s) + T_d·s/(1+T_v·s))  =  K  +  (K/T_i)·1/s  +  (K·T_d)·s/(1+T_v·s).
+     Oben der fertige PID-Block, unten dieselbe Struktur aus P, I und DT1 — die Kurven liegen exakt aufeinander. */
+  pidbuild(){ const m=blank();
+    const K=2,Ti=1.5,Td=0.5,Tv=0.05;
+    const st=A(m,"step",20,150,{A:1}), s1=A(m,"sum",170,162,{s0:"+",s1:"−"},{ins:2}),
+          c1=A(m,"pid",240,150,{K,Ti,Td,Tv}),
+          g1=A(m,"pt2",420,150,{K:1,w0:1.2,D:0.4}),
+          y1=A(m,"scope",610,150,{name:"y  (PID-Block)"});
+    C(m,st,0,s1,0); C(m,s1,0,c1,0); C(m,c1,0,g1,0); C(m,g1,0,y1,0); C(m,g1,0,s1,1);
+    const st2=A(m,"step",20,430,{A:1}), s2=A(m,"sum",170,442,{s0:"+",s1:"−"},{ins:2}),
+          ne=A(m,"node",240,441),
+          kp=A(m,"gain",300,320,{k:K}),
+          ki=A(m,"integ",300,430,{K:K/Ti}),
+          kd=A(m,"dt1",300,540,{Td:K*Td,T:Tv}),
+          s3=A(m,"sum",480,442,{s0:"+",s1:"+",s2:"+"},{ins:3}),
+          g2=A(m,"pt2",560,430,{K:1,w0:1.2,D:0.4}),
+          y2=A(m,"scope",750,430,{name:"y  (P+I+DT1)"});
+    C(m,st2,0,s2,0); C(m,s2,0,ne,0);
+    C(m,ne,0,kp,0); C(m,ne,0,ki,0); C(m,ne,0,kd,0);
+    C(m,kp,0,s3,2); C(m,ki,0,s3,0); C(m,kd,0,s3,1);
+    C(m,s3,0,g2,0); C(m,g2,0,y2,0); C(m,g2,0,s2,1);
+    return m; },
+
+  /* Übung 6: Fahrtregelung über Schub. V̇ = Xu·V + Xf·f, Windstörung am Streckeneingang.
+     Strecke = PT1 mit T = −1/Xu ≈ 60 s. PI-Regler ⇒ V folgt VC trotz Störung. */
+  speed(){ const m=blank();
+    const vc=A(m,"step",20,150,{A:5}),
+          su=A(m,"sum",170,162,{s0:"+",s1:"−"},{ins:2}),
+          pi=A(m,"pi",240,150,{K:2,Ti:20}),
+          sz=A(m,"sum",420,162,{s0:"+",s1:"−"},{ins:2}),
+          zw=A(m,"step",380,20,{A:2,t0:150}),
+          fz=A(m,"pt1",500,150,{K:1,T:59.9}),
+          nv=A(m,"node",664,161),
+          sv=A(m,"scope",720,150,{name:"V  [m/s]"});
+    C(m,vc,0,su,0); C(m,su,0,pi,0); C(m,pi,0,sz,0); C(m,zw,0,sz,1); C(m,sz,0,fz,0);
+    C(m,fz,0,nv,0); C(m,nv,0,sv,0);
+    C(m,nv,0,su,1,330,"H");
+    return m; }
+};
+function blank(){ return {blocks:[],edges:[],next:1}; }
+function A(m,type,x,y,params,o){ const d=DEFS[type]; o=o||{};
+  const b={id:m.next++,type,x,y,ins:o.ins||d.ins,outs:o.outs||d.outs,flip:!!o.flip,
+    params:Object.assign({},d.params,params||{})}; m.blocks.push(b); return b.id; }
+function C(m,a,ap,b,port,mv,fam){ const e={from:a,fromPort:ap||0,to:b,port:port||0};
+  if(mv!==undefined){e.m=mv;e.fam=fam||"H";} m.edges.push(e); }
+function fitView(){
+  if(!model.blocks.length){ view={x:40,y:40,k:1}; return; }
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  for(const b of model.blocks){ const s=SIZE(b); x0=Math.min(x0,b.x); y0=Math.min(y0,b.y-18); x1=Math.max(x1,b.x+s.w); y1=Math.max(y1,b.y+s.h); }
+  const W=stage.clientWidth||800, H=stage.clientHeight||400, mgn=52;
+  const k=Math.max(.45,Math.min(1,(W-mgn)/(x1-x0),(H-mgn)/(y1-y0)));
+  view={k, x:(W-(x1-x0)*k)/2-x0*k, y:(H-(y1-y0)*k)/2-y0*k};
+}
+
+$("#preset").addEventListener("change",e=>{
+  const k=e.target.value;
+  flushParams();
+  model=normalize(k?PRESETS[k]():blank()); sel=null; selEdge=null;
+  const tset={loop:20,basics:12,msd:20,pitch:10,pitch2:10,yaw:30,theta:30,alt:30,altwind:300,speed:400,pidbuild:15}[k]; if(tset) $("#tend").value=tset;
+  fitView(); render(); inspector(); run(); commit();
+});
+
+/* Start */
+$("#preset").value="pitch"; $("#tend").value=10; model=normalize(PRESETS.pitch());
+render(); inspector();
+requestAnimationFrame(()=>{ setPH(Math.min(320,Math.round(window.innerHeight*0.42))); fitView(); render(); run(); histPrev=snap(); });
+</script>
+</body>
+</html>
